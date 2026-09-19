@@ -9,7 +9,7 @@ type ProgressBarProps = {
 };
 
 export function ProgressBar({ value, color = colors.primary, height = 8 }: ProgressBarProps) {
-  const safeValue = Math.max(0, Math.min(value, 1));
+  const safeValue = Number.isFinite(value) ? Math.max(0, Math.min(value, 1)) : 0;
 
   return (
     <View style={[styles.track, { height }]}>

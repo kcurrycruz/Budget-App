@@ -14,6 +14,7 @@ coverage/
 .nuxt/
 .svelte-kit/
 .expo/
+.pnpm-store/
 
 # Python
 __pycache__/

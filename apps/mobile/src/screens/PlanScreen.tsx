@@ -17,6 +17,7 @@ export function PlanScreen({ categories, income, bills }: PlanScreenProps) {
   const flexibleBudget = categories.reduce((sum, category) => sum + category.budget, 0);
   const planned = bills + flexibleBudget;
   const buffer = income - planned;
+  const plannedRatio = income > 0 ? Math.min(planned / income, 1) : 0;
 
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -34,7 +35,7 @@ export function PlanScreen({ categories, income, bills }: PlanScreenProps) {
           </View>
         </View>
         <View style={styles.planTrack}>
-          <View style={[styles.planTrackFill, { width: `${Math.min(planned / income, 1) * 100}%` }]} />
+          <View style={[styles.planTrackFill, { width: `${plannedRatio * 100}%` }]} />
         </View>
         <Text style={styles.planDetail}>{formatMoney(income)} expected income</Text>
       </View>

@@ -24,7 +24,6 @@ Build a phone-first budget app that makes entering financial information and und
 ## Product decisions to confirm
 
 - Whether the first budgeting model is category limits, zero-based budgeting, or a simpler spend-versus-income plan.
-- Whether the first private beta is only for one person or supports invited friends with separate accounts.
 - Which spreadsheet tabs and fields must be migrated into the app.
 - Whether recurring bills should be detected automatically or entered manually first.
 - Authentication, data-retention, deletion, and support requirements.
@@ -51,3 +50,6 @@ Plaid credentials and access tokens must never be committed or stored in the mob
 ## Decision log
 
 Record decisions here with the date, decision, and reason. Move longer technical notes into their own files under `docs/` and link them from this section.
+
+- 2026-09-19: The first private beta will support multiple people with completely separate, private budgets. Shared household budgets are deferred until the personal workflow is proven.
+- 2026-09-19: Supabase Auth, Postgres, and Row Level Security will provide the first multi-user backend. Plaid credentials remain server-only.

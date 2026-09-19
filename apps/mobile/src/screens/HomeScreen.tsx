@@ -14,6 +14,9 @@ type HomeScreenProps = {
   onAdd: () => void;
   onConnect: () => void;
   onViewTransactions: () => void;
+  onOpenProfile?: () => void;
+  userInitials?: string;
+  previewMode?: boolean;
 };
 
 export function HomeScreen({
@@ -23,6 +26,9 @@ export function HomeScreen({
   onAdd,
   onConnect,
   onViewTransactions,
+  onOpenProfile,
+  userInitials = 'KC',
+  previewMode = false,
 }: HomeScreenProps) {
   const spent = categories.reduce((total, category) => total + category.spent, 0);
   const left = income - spent;
@@ -34,8 +40,20 @@ export function HomeScreen({
           <Text style={styles.greeting}>Good afternoon</Text>
           <Text style={styles.title}>Your September</Text>
         </View>
-        <View style={styles.avatar}><Text style={styles.avatarText}>KC</Text></View>
+        <Pressable accessibilityLabel="Open account menu" onPress={onOpenProfile} style={styles.avatar}>
+          <Text style={styles.avatarText}>{userInitials}</Text>
+        </Pressable>
       </View>
+
+      {previewMode ? (
+        <View style={styles.previewCard}>
+          <MaterialCommunityIcons color={colors.primaryDark} name="cloud-outline" size={21} />
+          <View style={styles.previewCopy}>
+            <Text style={styles.previewTitle}>Preview mode</Text>
+            <Text style={styles.previewText}>Connect Supabase to turn on private accounts and cloud sync.</Text>
+          </View>
+        </View>
+      ) : null}
 
       <View style={styles.balanceCard}>
         <View style={styles.balanceTop}>
@@ -125,6 +143,10 @@ const styles = StyleSheet.create({
   title: { color: colors.ink, fontSize: 30, fontWeight: '800', letterSpacing: -0.9, marginTop: 2 },
   avatar: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.pill, height: 44, justifyContent: 'center', width: 44 },
   avatarText: { color: colors.primaryDark, fontSize: 14, fontWeight: '800' },
+  previewCard: { alignItems: 'flex-start', backgroundColor: colors.primarySoft, borderRadius: radius.md, flexDirection: 'row', gap: spacing.md, padding: spacing.md },
+  previewCopy: { flex: 1, gap: 2 },
+  previewTitle: { color: colors.primaryDark, fontSize: 12, fontWeight: '800' },
+  previewText: { color: colors.primaryDark, fontSize: 11, lineHeight: 16 },
   balanceCard: { backgroundColor: colors.primaryDark, borderRadius: radius.lg, gap: spacing.lg, padding: spacing.xl, ...shadow },
   balanceTop: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'space-between' },
   balanceLabel: { color: '#BFD8C9', fontSize: 13, fontWeight: '600' },

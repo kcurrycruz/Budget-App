@@ -28,6 +28,10 @@ The mobile app is the first client. A shared API and web client can be added lat
 
 Plaid's native React Native SDK is not supported in Expo Go. The current prototype uses a safe connection placeholder; the real integration will use a custom development build and a server-generated Link token.
 
+## Multi-user cloud setup
+
+The app includes a Supabase-ready sign-up and sign-in flow plus a Row Level Security migration. Without Supabase environment variables it intentionally runs in preview mode. Follow [`docs/MULTI_USER_SETUP.md`](docs/MULTI_USER_SETUP.md) to connect a cloud project safely.
+
 ## Working agreement
 
 - Keep `main` stable.
