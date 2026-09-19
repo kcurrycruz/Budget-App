@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "Budget App",
+    "slug": "budget-app-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.karlcruz.budgetapp"
+    },
+    "android": {
+      "package": "com.karlcruz.budgetapp",
+      "adaptiveIcon": {
+        "backgroundColor": "#F5F7F3"
+      }
+    }
+  }
+}

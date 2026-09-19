@@ -2,25 +2,52 @@
 
 ## Goal
 
-Build a budget app that makes day-to-day money decisions clear, trustworthy, and easy to maintain.
+Build a phone-first budget app that makes entering financial information and understanding monthly cash flow easier than maintaining a spreadsheet.
+
+## Product principles
+
+- Make the next useful action obvious.
+- Show a monthly answer before detailed analysis.
+- Keep manual entry fast even after connected accounts are available.
+- Explain financial data in plain language.
+- Treat privacy, user consent, and traceable edits as product features.
+
+## First release
+
+- Home view with income, spending, and remaining money.
+- Quick manual expense entry with broad categories.
+- Transaction activity with search and filters.
+- Monthly plan for fixed and flexible spending.
+- Plaid account connection for bank and credit-card transactions.
+- Review queue for imported transactions that need a category.
 
 ## Product decisions to confirm
 
-- Primary users and the budgeting method they follow.
-- Web, desktop, or mobile delivery target.
-- Manual transaction entry, file import, or bank integration.
-- Required account, category, recurring expense, and reporting features.
-- Authentication, sync, backup, and privacy requirements.
+- Whether the first budgeting model is category limits, zero-based budgeting, or a simpler spend-versus-income plan.
+- Whether the first private beta is only for one person or supports invited friends with separate accounts.
+- Which spreadsheet tabs and fields must be migrated into the app.
+- Whether recurring bills should be detected automatically or entered manually first.
+- Authentication, data-retention, deletion, and support requirements.
+
+## Technical direction
+
+- Client: Expo SDK 57 with React Native and TypeScript.
+- Mobile platforms: iOS and Android from one codebase.
+- Web: reuse domain types and design tokens after the mobile workflow is proven.
+- Plaid: React Native Link SDK in a custom development build.
+- Server: create Link tokens, exchange public tokens, encrypt access tokens, process webhooks, and normalize transactions.
+- Data: keep imported transaction identity separate from user edits so syncs never overwrite a correction.
+
+Plaid credentials and access tokens must never be committed or stored in the mobile app.
 
 ## Suggested milestones
 
-1. Define the first release and choose the technology stack.
-2. Establish the application shell, automated checks, and deployment path.
-3. Implement accounts, categories, transactions, and monthly budgets.
-4. Add summaries, reports, validation, and accessible interaction states.
-5. Test with anonymized data and prepare the first release.
+1. Validate the mobile prototype against the current spreadsheet workflow.
+2. Map the spreadsheet data into accounts, categories, budgets, and transactions.
+3. Add persistence, authentication, and a secure API.
+4. Connect Plaid sandbox and implement transaction sync and review.
+5. Test with anonymized data, add automated checks, and ship a private beta.
 
 ## Decision log
 
 Record decisions here with the date, decision, and reason. Move longer technical notes into their own files under `docs/` and link them from this section.
-

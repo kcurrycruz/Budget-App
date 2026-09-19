@@ -13,6 +13,7 @@ coverage/
 .next/
 .nuxt/
 .svelte-kit/
+.expo/
 
 # Python
 __pycache__/
@@ -39,4 +40,3 @@ Thumbs.db
 *.tmp
 tmp/
 temp/
-
