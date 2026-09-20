@@ -42,6 +42,8 @@ type TransactionRow = {
   needs_review: boolean;
   transaction_date: string;
   pending: boolean;
+  source: 'manual' | 'plaid';
+  note: string | null;
 };
 
 const getMonthBounds = () => {
@@ -81,7 +83,7 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
     client.from('budget_months').select('expected_income, fixed_costs').eq('month', start).maybeSingle(),
     client.from('categories').select('id, name, color, icon, monthly_limit').is('archived_at', null).order('sort_order'),
     client.from('financial_accounts').select('id, display_name, institution_name, mask, account_type, current_balance, connection_status, plaid_item_id, last_synced_at').is('disconnected_at', null).order('created_at'),
-    client.from('transactions').select('id, merchant_name, category_id, financial_account_id, amount, direction, needs_review, transaction_date, pending').gte('transaction_date', start).lt('transaction_date', end).order('transaction_date', { ascending: false }).order('created_at', { ascending: false }),
+    client.from('transactions').select('id, merchant_name, category_id, financial_account_id, amount, direction, needs_review, transaction_date, pending, source, note').gte('transaction_date', start).lt('transaction_date', end).order('transaction_date', { ascending: false }).order('created_at', { ascending: false }),
   ]);
 
   const error = monthResult.error ?? categoriesResult.error ?? accountsResult.error ?? transactionsResult.error;
@@ -131,6 +133,9 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
     date: formatActivityDate(transaction.transaction_date),
     account: transaction.financial_account_id ? accountNames.get(transaction.financial_account_id) ?? 'Connected account' : 'Manual entry',
     pending: transaction.pending,
+    source: transaction.source,
+    note: transaction.note ?? undefined,
+    transactionDate: transaction.transaction_date,
   }));
 
   return {
@@ -155,7 +160,7 @@ export async function createManualTransaction(draft: ManualTransactionDraft) {
       source: 'manual',
       note: draft.note || null,
     })
-    .select('id, merchant_name, category_id, amount, direction, needs_review, transaction_date, pending')
+    .select('id, merchant_name, category_id, amount, direction, needs_review, transaction_date, pending, source, note')
     .single();
 
   if (error) throw error;
@@ -170,7 +175,60 @@ export async function createManualTransaction(draft: ManualTransactionDraft) {
     date: formatActivityDate(data.transaction_date as string),
     account: 'Manual entry',
     pending: Boolean(data.pending),
+    source: data.source as 'manual',
+    note: (data.note as string | null) ?? undefined,
+    transactionDate: data.transaction_date as string,
   } satisfies Transaction;
+}
+
+export async function updateManualTransaction(transactionId: string, draft: ManualTransactionDraft) {
+  const client = requireClient();
+  const { data, error } = await client
+    .from('transactions')
+    .update({
+      merchant_name: draft.merchant,
+      amount: draft.amount,
+      direction: draft.direction,
+      category_id: draft.direction === 'outflow' ? draft.categoryId : null,
+      transaction_date: draft.transactionDate,
+      note: draft.note || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', transactionId)
+    .eq('source', 'manual')
+    .select('id, merchant_name, category_id, amount, direction, needs_review, transaction_date, pending, source, note')
+    .single();
+
+  if (error) throw error;
+
+  return {
+    id: data.id as string,
+    merchant: data.merchant_name as string,
+    categoryId: (data.category_id as string | null) ?? '',
+    amount: Number(data.amount),
+    direction: data.direction as 'outflow' | 'inflow',
+    needsReview: Boolean(data.needs_review),
+    date: formatActivityDate(data.transaction_date as string),
+    account: 'Manual entry',
+    pending: Boolean(data.pending),
+    source: data.source as 'manual',
+    note: (data.note as string | null) ?? undefined,
+    transactionDate: data.transaction_date as string,
+  } satisfies Transaction;
+}
+
+export async function deleteManualTransaction(transactionId: string) {
+  const client = requireClient();
+  const { data, error } = await client
+    .from('transactions')
+    .delete()
+    .eq('id', transactionId)
+    .eq('source', 'manual')
+    .select('id')
+    .single();
+
+  if (error) throw error;
+  if (!data?.id) throw new Error('The manual transaction could not be deleted.');
 }
 
 export async function categorizeTransaction(transactionId: string, categoryId: string) {

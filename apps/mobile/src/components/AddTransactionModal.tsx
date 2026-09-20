@@ -13,51 +13,70 @@ import {
 } from 'react-native';
 
 import { colors, radius, spacing } from '../theme';
-import type { Category, ManualTransactionDraft } from '../types';
-import { toDateOnly } from '../utils/date';
+import type { Category, ManualTransactionDraft, Transaction } from '../types';
+import { formatActivityDate, toDateOnly } from '../utils/date';
 import { formatMoneyInput, parseMoneyInput } from '../utils/money';
 
 type AddTransactionModalProps = {
   categories: Category[];
+  initialTransaction?: Transaction | null;
   visible: boolean;
   saving: boolean;
   onClose: () => void;
   onSave: (draft: ManualTransactionDraft) => void;
 };
 
-export function AddTransactionModal({ categories, visible, saving, onClose, onSave }: AddTransactionModalProps) {
+export function AddTransactionModal({ categories, initialTransaction, visible, saving, onClose, onSave }: AddTransactionModalProps) {
   const [merchant, setMerchant] = useState('');
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState(categories[0]?.id ?? 'other');
   const [direction, setDirection] = useState<'outflow' | 'inflow'>('outflow');
-  const [dateChoice, setDateChoice] = useState<'today' | 'yesterday'>('today');
+  const [transactionDate, setTransactionDate] = useState(toDateOnly(new Date()));
   const [note, setNote] = useState('');
 
   useEffect(() => {
-    if (!visible) {
+    if (visible && initialTransaction) {
+      setMerchant(initialTransaction.merchant);
+      setAmount(formatMoneyInput(String(initialTransaction.amount)));
+      setCategoryId(initialTransaction.categoryId || categories[0]?.id || 'other');
+      setDirection(initialTransaction.direction ?? 'outflow');
+      setTransactionDate(initialTransaction.transactionDate ?? toDateOnly(new Date()));
+      setNote(initialTransaction.note ?? '');
+    } else if (!visible) {
       setMerchant('');
       setAmount('');
       setCategoryId(categories[0]?.id ?? 'other');
       setDirection('outflow');
-      setDateChoice('today');
+      setTransactionDate(toDateOnly(new Date()));
       setNote('');
     }
-  }, [categories, visible]);
+  }, [categories, initialTransaction, visible]);
+
+  const today = toDateOnly(new Date());
+  const yesterdayDate = new Date();
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterday = toDateOnly(yesterdayDate);
+  const dateOptions = [
+    { value: today, label: 'Today' },
+    { value: yesterday, label: 'Yesterday' },
+    ...(initialTransaction?.transactionDate
+      && ![today, yesterday].includes(initialTransaction.transactionDate)
+      ? [{ value: initialTransaction.transactionDate, label: initialTransaction.date || formatActivityDate(initialTransaction.transactionDate) }]
+      : []),
+  ];
 
   const numericAmount = parseMoneyInput(amount);
   const canSave = !saving && merchant.trim().length > 0 && Number.isFinite(numericAmount) && numericAmount > 0;
 
   const save = () => {
     if (!canSave) return;
-    const transactionDate = new Date();
-    if (dateChoice === 'yesterday') transactionDate.setDate(transactionDate.getDate() - 1);
     onSave({
       merchant: merchant.trim(),
       amount: numericAmount,
       categoryId: direction === 'outflow' ? categoryId : '',
       direction,
       note: note.trim(),
-      transactionDate: toDateOnly(transactionDate),
+      transactionDate,
     });
   };
 
@@ -69,7 +88,7 @@ export function AddTransactionModal({ categories, visible, saving, onClose, onSa
             <Pressable accessibilityLabel="Close transaction entry" disabled={saving} onPress={onClose} style={styles.closeButton}>
               <MaterialCommunityIcons color={colors.ink} name="close" size={22} />
             </Pressable>
-            <Text style={styles.title}>Add transaction</Text>
+            <Text style={styles.title}>{initialTransaction ? 'Edit transaction' : 'Add transaction'}</Text>
             <View style={styles.headerSpacer} />
           </View>
 
@@ -152,18 +171,18 @@ export function AddTransactionModal({ categories, visible, saving, onClose, onSa
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>Date</Text>
             <View style={styles.dateChoices}>
-              {(['today', 'yesterday'] as const).map((choice) => {
-                const selected = dateChoice === choice;
+              {dateOptions.map((option) => {
+                const selected = transactionDate === option.value;
                 return (
                   <Pressable
                     accessibilityRole="radio"
                     accessibilityState={{ checked: selected }}
-                    key={choice}
-                    onPress={() => setDateChoice(choice)}
+                    key={option.value}
+                    onPress={() => setTransactionDate(option.value)}
                     style={[styles.dateChoice, selected && styles.dateChoiceSelected]}
                   >
                     <Text style={[styles.dateChoiceText, selected && styles.dateChoiceTextSelected]}>
-                      {choice === 'today' ? 'Today' : 'Yesterday'}
+                      {option.label}
                     </Text>
                   </Pressable>
                 );
@@ -183,13 +202,15 @@ export function AddTransactionModal({ categories, visible, saving, onClose, onSa
             />
           </View>
 
-          {direction === 'outflow' ? <View style={styles.autoCard}>
+          {direction === 'outflow' && !initialTransaction ? <View style={styles.autoCard}>
             <MaterialCommunityIcons color={colors.primary} name="auto-fix" size={21} />
             <Text style={styles.autoText}>Future connected transactions will be categorized automatically, and you can always correct them.</Text>
           </View> : null}
 
           <Pressable disabled={!canSave} onPress={save} style={[styles.saveButton, !canSave && styles.saveButtonDisabled]}>
-            <Text style={styles.saveButtonText}>{saving ? 'Saving…' : `Save ${direction === 'outflow' ? 'expense' : 'income'}`}</Text>
+            <Text style={styles.saveButtonText}>
+              {saving ? 'Saving…' : initialTransaction ? 'Save changes' : `Save ${direction === 'outflow' ? 'expense' : 'income'}`}
+            </Text>
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>

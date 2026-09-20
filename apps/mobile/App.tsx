@@ -6,7 +6,15 @@ import { Alert, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-na
 import { AddTransactionModal } from './src/components/AddTransactionModal';
 import { BottomNav } from './src/components/BottomNav';
 import { ReviewTransactionModal } from './src/components/ReviewTransactionModal';
-import { categorizeTransaction, createManualTransaction, exportCloudBudget, loadCloudBudget, saveMonthlyPlan } from './src/data/budgetRepository';
+import {
+  categorizeTransaction,
+  createManualTransaction,
+  deleteManualTransaction,
+  exportCloudBudget,
+  loadCloudBudget,
+  saveMonthlyPlan,
+  updateManualTransaction,
+} from './src/data/budgetRepository';
 import { accounts, initialCategories, initialTransactions, monthlyBills, monthlyIncome } from './src/data/demo';
 import { isCloudConfigured, supabase } from './src/lib/supabase';
 import { AccountScreen } from './src/screens/AccountScreen';
@@ -68,10 +76,12 @@ function BudgetApp({ session }: BudgetAppProps) {
   const [dataError, setDataError] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [addSaving, setAddSaving] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [planEditing, setPlanEditing] = useState(forcePlanPreview);
   const [accountOpen, setAccountOpen] = useState(false);
   const [reviewTransaction, setReviewTransaction] = useState<Transaction | null>(null);
   const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewDeleting, setReviewDeleting] = useState(false);
 
   const refreshCloudData = useCallback(async () => {
     if (!session) return;
@@ -95,21 +105,40 @@ function BudgetApp({ session }: BudgetAppProps) {
     void refreshCloudData();
   }, [refreshCloudData]);
 
-  const addTransaction = async (draft: ManualTransactionDraft) => {
+  const saveTransaction = async (draft: ManualTransactionDraft) => {
     let transaction: Transaction;
     setAddSaving(true);
     try {
-      transaction = session
-        ? await createManualTransaction(draft)
-        : {
-            id: `manual-${Date.now()}`,
-            merchant: draft.merchant,
-            amount: draft.amount,
-            categoryId: draft.categoryId,
-            direction: draft.direction,
-            date: formatActivityDate(draft.transactionDate),
-            account: 'Manual entry',
-          };
+      if (editingTransaction) {
+        transaction = session
+          ? await updateManualTransaction(editingTransaction.id, draft)
+          : {
+              ...editingTransaction,
+              merchant: draft.merchant,
+              amount: draft.amount,
+              categoryId: draft.categoryId,
+              direction: draft.direction,
+              date: formatActivityDate(draft.transactionDate),
+              note: draft.note || undefined,
+              source: 'manual',
+              transactionDate: draft.transactionDate,
+            };
+      } else {
+        transaction = session
+          ? await createManualTransaction(draft)
+          : {
+              id: `manual-${Date.now()}`,
+              merchant: draft.merchant,
+              amount: draft.amount,
+              categoryId: draft.categoryId,
+              direction: draft.direction,
+              date: formatActivityDate(draft.transactionDate),
+              account: 'Manual entry',
+              note: draft.note || undefined,
+              source: 'manual',
+              transactionDate: draft.transactionDate,
+            };
+      }
     } catch (caught) {
       Alert.alert('Could not save transaction', caught instanceof Error ? caught.message : 'Please try again.');
       return;
@@ -117,15 +146,76 @@ function BudgetApp({ session }: BudgetAppProps) {
       setAddSaving(false);
     }
 
-    setTransactions((current) => [transaction, ...current]);
-    if (draft.direction === 'outflow') {
-      setCategories((current) => current.map((category) => (
-        category.id === draft.categoryId
-          ? { ...category, spent: category.spent + draft.amount }
-          : category
-      )));
+    if (editingTransaction) {
+      const previous = editingTransaction;
+      setTransactions((current) => current.map((item) => (item.id === transaction.id ? transaction : item)));
+      setCategories((current) => current.map((category) => {
+        let spent = category.spent;
+        if ((previous.direction ?? 'outflow') === 'outflow' && category.id === previous.categoryId) {
+          spent = Math.max(0, spent - previous.amount);
+        }
+        if (draft.direction === 'outflow' && category.id === draft.categoryId) {
+          spent += draft.amount;
+        }
+        return spent === category.spent ? category : { ...category, spent };
+      }));
+    } else {
+      setTransactions((current) => [transaction, ...current]);
+      if (draft.direction === 'outflow') {
+        setCategories((current) => current.map((category) => (
+          category.id === draft.categoryId
+            ? { ...category, spent: category.spent + draft.amount }
+            : category
+        )));
+      }
     }
+    setEditingTransaction(null);
     setAddOpen(false);
+  };
+
+  const openTransactionEntry = () => {
+    setEditingTransaction(null);
+    setAddOpen(true);
+  };
+
+  const editReviewedTransaction = () => {
+    if (reviewTransaction?.source !== 'manual') return;
+    setEditingTransaction(reviewTransaction);
+    setReviewTransaction(null);
+    setAddOpen(true);
+  };
+
+  const performDeleteReviewedTransaction = async (transaction: Transaction) => {
+    setReviewDeleting(true);
+    try {
+      if (session) await deleteManualTransaction(transaction.id);
+      setTransactions((current) => current.filter((item) => item.id !== transaction.id));
+      if ((transaction.direction ?? 'outflow') === 'outflow') {
+        setCategories((current) => current.map((category) => (
+          category.id === transaction.categoryId
+            ? { ...category, spent: Math.max(0, category.spent - transaction.amount) }
+            : category
+        )));
+      }
+      setReviewTransaction(null);
+    } catch (caught) {
+      Alert.alert('Could not delete transaction', caught instanceof Error ? caught.message : 'Please try again.');
+    } finally {
+      setReviewDeleting(false);
+    }
+  };
+
+  const confirmDeleteReviewedTransaction = () => {
+    const transaction = reviewTransaction;
+    if (!transaction || transaction.source !== 'manual') return;
+    Alert.alert(
+      'Delete this transaction?',
+      `${transaction.merchant} will be permanently removed from your budget.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => { void performDeleteReviewedTransaction(transaction); } },
+      ],
+    );
   };
 
   const savePlan = async (input: { bills: number; categoryBudgets: Record<string, number>; income: number }) => {
@@ -252,7 +342,7 @@ function BudgetApp({ session }: BudgetAppProps) {
         return (
           <TransactionsScreen
             categories={categories}
-            onAdd={() => setAddOpen(true)}
+            onAdd={openTransactionEntry}
             onReview={setReviewTransaction}
             transactions={transactions}
           />
@@ -266,7 +356,7 @@ function BudgetApp({ session }: BudgetAppProps) {
           <HomeScreen
             categories={categories}
             income={income}
-            onAdd={() => setAddOpen(true)}
+            onAdd={openTransactionEntry}
             onConnect={() => setActiveTab('connect')}
             onOpenProfile={openProfile}
             onViewTransactions={() => setActiveTab('transactions')}
@@ -285,14 +375,21 @@ function BudgetApp({ session }: BudgetAppProps) {
       <BottomNav activeTab={activeTab} onChange={setActiveTab} />
       <AddTransactionModal
         categories={categories}
-        onClose={() => setAddOpen(false)}
-        onSave={addTransaction}
+        initialTransaction={editingTransaction}
+        onClose={() => {
+          setAddOpen(false);
+          setEditingTransaction(null);
+        }}
+        onSave={saveTransaction}
         saving={addSaving}
         visible={addOpen}
       />
       <ReviewTransactionModal
         categories={categories}
+        deleting={reviewDeleting}
         onClose={() => setReviewTransaction(null)}
+        onDelete={confirmDeleteReviewedTransaction}
+        onEdit={editReviewedTransaction}
         onSave={saveTransactionCategory}
         saving={reviewSaving}
         transaction={reviewTransaction}

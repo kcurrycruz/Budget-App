@@ -70,3 +70,4 @@ Record decisions here with the date, decision, and reason. Move longer technical
 - 2026-09-20: Treat the current feature set and UI as the private-beta baseline. Future feature additions and UI changes are explicitly expected rather than constrained by the first release layout.
 - 2026-09-20: Manual entry supports both expenses and income, lightweight date and note capture, and explicit save progress. Activity filters must represent real behavior rather than decorative controls.
 - 2026-09-20: Money fields use grouped thousands while typing and left-aligned mobile inputs so plan setup remains easy to scan and edit.
+- 2026-09-20: Manual transactions can be fully edited or deleted with confirmation. Plaid-imported transactions keep their source details protected and only allow category corrections.

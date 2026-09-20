@@ -16,7 +16,10 @@ export type Transaction = {
   account: string;
   direction?: 'outflow' | 'inflow';
   needsReview?: boolean;
+  note?: string;
   pending?: boolean;
+  source?: 'manual' | 'plaid';
+  transactionDate?: string;
 };
 
 export type ManualTransactionDraft = {

@@ -9,16 +9,22 @@ import { formatMoney } from '../utils/money';
 type ReviewTransactionModalProps = {
   categories: Category[];
   transaction: Transaction | null;
+  deleting: boolean;
   saving: boolean;
   onClose: () => void;
+  onDelete: () => void;
+  onEdit: () => void;
   onSave: (categoryId: string) => void;
 };
 
 export function ReviewTransactionModal({
   categories,
   transaction,
+  deleting,
   saving,
   onClose,
+  onDelete,
+  onEdit,
   onSave,
 }: ReviewTransactionModalProps) {
   const [categoryId, setCategoryId] = useState('');
@@ -28,15 +34,18 @@ export function ReviewTransactionModal({
   }, [transaction]);
 
   if (!transaction) return null;
+  const isInflow = transaction.direction === 'inflow';
+  const isManual = transaction.source === 'manual';
+  const busy = saving || deleting;
 
   return (
     <Modal animationType="slide" onRequestClose={onClose} presentationStyle="pageSheet" visible>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Pressable accessibilityLabel="Close transaction review" disabled={saving} onPress={onClose} style={styles.closeButton}>
+          <Pressable accessibilityLabel="Close transaction details" disabled={busy} onPress={onClose} style={styles.closeButton}>
             <MaterialCommunityIcons color={colors.ink} name="close" size={22} />
           </Pressable>
-          <Text style={styles.title}>Review transaction</Text>
+          <Text style={styles.title}>Transaction details</Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -49,14 +58,19 @@ export function ReviewTransactionModal({
             {transaction.direction === 'inflow' ? '+' : '−'}{formatMoney(transaction.amount, true)}
           </Text>
           <Text style={styles.account}>{transaction.account} · {transaction.date}</Text>
+          {transaction.note ? <Text style={styles.note}>{transaction.note}</Text> : null}
         </View>
 
-        <View style={styles.guidance}>
+        {!isInflow ? <View style={styles.guidance}>
           <MaterialCommunityIcons color={colors.primary} name="tag-check-outline" size={21} />
-          <Text style={styles.guidanceText}>Choose where this belongs. Your monthly totals will update immediately.</Text>
-        </View>
+          <Text style={styles.guidanceText}>
+            {transaction.needsReview
+              ? 'Choose where this belongs. Your monthly totals will update immediately.'
+              : 'Change the category anytime. Your monthly totals will stay in sync.'}
+          </Text>
+        </View> : null}
 
-        <View style={styles.fieldGroup}>
+        {!isInflow ? <View style={styles.fieldGroup}>
           <Text style={styles.fieldLabel}>Category</Text>
           <View style={styles.categories}>
             {categories.map((category) => {
@@ -82,15 +96,37 @@ export function ReviewTransactionModal({
               );
             })}
           </View>
-        </View>
+        </View> : null}
 
-        <Pressable
-          disabled={!categoryId || saving}
-          onPress={() => onSave(categoryId)}
-          style={[styles.saveButton, (!categoryId || saving) && styles.saveButtonDisabled]}
-        >
-          <Text style={styles.saveButtonText}>{saving ? 'Saving…' : 'Save category'}</Text>
-        </Pressable>
+        {!isInflow ? (
+          <Pressable
+            disabled={!categoryId || busy}
+            onPress={() => onSave(categoryId)}
+            style={[styles.saveButton, (!categoryId || busy) && styles.saveButtonDisabled]}
+          >
+            <Text style={styles.saveButtonText}>{saving ? 'Saving…' : 'Save category'}</Text>
+          </Pressable>
+        ) : null}
+
+        {isManual ? (
+          <View style={styles.manualActions}>
+            <View style={styles.manualHeading}>
+              <MaterialCommunityIcons color={colors.primaryDark} name="pencil-outline" size={20} />
+              <View style={styles.manualCopy}>
+                <Text style={styles.manualTitle}>Manual entry</Text>
+                <Text style={styles.manualDetail}>You can edit every detail or remove this transaction.</Text>
+              </View>
+            </View>
+            <View style={styles.actionRow}>
+              <Pressable disabled={busy} onPress={onEdit} style={styles.editButton}>
+                <Text style={styles.editButtonText}>Edit details</Text>
+              </Pressable>
+              <Pressable disabled={busy} onPress={onDelete} style={styles.deleteButton}>
+                <Text style={styles.deleteButtonText}>{deleting ? 'Deleting…' : 'Delete'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
       </ScrollView>
     </Modal>
   );
@@ -107,6 +143,7 @@ const styles = StyleSheet.create({
   merchant: { color: colors.ink, fontSize: 20, fontWeight: '800', marginTop: spacing.md, textAlign: 'center' },
   amount: { color: colors.ink, fontSize: 34, fontWeight: '800', marginTop: spacing.xs },
   account: { color: colors.inkMuted, fontSize: 12, marginTop: spacing.sm },
+  note: { backgroundColor: colors.surfaceMuted, borderRadius: radius.sm, color: colors.inkMuted, fontSize: 12, lineHeight: 18, marginTop: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, textAlign: 'center' },
   guidance: { alignItems: 'flex-start', backgroundColor: colors.primarySoft, borderRadius: radius.md, flexDirection: 'row', gap: spacing.md, padding: spacing.lg },
   guidanceText: { color: colors.primaryDark, flex: 1, fontSize: 12, lineHeight: 18 },
   fieldGroup: { gap: spacing.md },
@@ -121,4 +158,14 @@ const styles = StyleSheet.create({
   saveButton: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: radius.md, marginTop: 'auto', padding: spacing.lg },
   saveButtonDisabled: { opacity: 0.4 },
   saveButtonText: { color: colors.white, fontSize: 16, fontWeight: '800' },
+  manualActions: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, gap: spacing.md, padding: spacing.lg },
+  manualHeading: { alignItems: 'flex-start', flexDirection: 'row', gap: spacing.md },
+  manualCopy: { flex: 1, gap: 3 },
+  manualTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  manualDetail: { color: colors.inkMuted, fontSize: 12, lineHeight: 17 },
+  actionRow: { flexDirection: 'row', gap: spacing.sm },
+  editButton: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.sm, flex: 1, paddingVertical: 12 },
+  editButtonText: { color: colors.primaryDark, fontSize: 13, fontWeight: '800' },
+  deleteButton: { alignItems: 'center', borderColor: '#E8CACA', borderRadius: radius.sm, borderWidth: 1, flex: 1, paddingVertical: 12 },
+  deleteButtonText: { color: colors.danger, fontSize: 13, fontWeight: '800' },
 });

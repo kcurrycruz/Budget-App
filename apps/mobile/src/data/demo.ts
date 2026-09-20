@@ -12,11 +12,11 @@ export const initialCategories: Category[] = [
 ];
 
 export const initialTransactions: Transaction[] = [
-  { id: 't1', merchant: 'Trader Joe’s', categoryId: 'food', amount: 74.28, date: 'Today', account: 'Everyday checking' },
-  { id: 't2', merchant: 'City Electric', categoryId: 'home', amount: 118.44, date: 'Yesterday', account: 'Everyday checking' },
-  { id: 't3', merchant: 'Metro Card', categoryId: 'transport', amount: 32, date: 'Sep 17', account: 'Everyday checking' },
-  { id: 't4', merchant: 'Corner Coffee', categoryId: 'food', amount: 6.85, date: 'Sep 17', account: 'Rewards card', pending: true },
-  { id: 't5', merchant: 'Movie Night', categoryId: 'fun', amount: 28, date: 'Sep 15', account: 'Rewards card' },
+  { id: 't1', merchant: 'Trader Joe’s', categoryId: 'food', amount: 74.28, date: 'Today', account: 'Everyday checking', source: 'plaid', transactionDate: '2026-09-20' },
+  { id: 't2', merchant: 'City Electric', categoryId: 'home', amount: 118.44, date: 'Yesterday', account: 'Everyday checking', source: 'plaid', transactionDate: '2026-09-19' },
+  { id: 't3', merchant: 'Metro Card', categoryId: 'transport', amount: 32, date: 'Sep 17', account: 'Everyday checking', source: 'plaid', transactionDate: '2026-09-17' },
+  { id: 't4', merchant: 'Corner Coffee', categoryId: 'food', amount: 6.85, date: 'Sep 17', account: 'Rewards card', pending: true, source: 'plaid', transactionDate: '2026-09-17' },
+  { id: 't5', merchant: 'Movie Night', categoryId: 'fun', amount: 28, date: 'Sep 15', account: 'Manual entry', note: 'Tickets and snacks', source: 'manual', transactionDate: '2026-09-15' },
 ];
 
 export const accounts: Account[] = [
