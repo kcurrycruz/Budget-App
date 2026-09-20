@@ -5,7 +5,8 @@ import { Alert, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-na
 
 import { AddTransactionModal } from './src/components/AddTransactionModal';
 import { BottomNav } from './src/components/BottomNav';
-import { createManualTransaction, exportCloudBudget, loadCloudBudget, saveMonthlyPlan } from './src/data/budgetRepository';
+import { ReviewTransactionModal } from './src/components/ReviewTransactionModal';
+import { categorizeTransaction, createManualTransaction, exportCloudBudget, loadCloudBudget, saveMonthlyPlan } from './src/data/budgetRepository';
 import { accounts, initialCategories, initialTransactions, monthlyBills, monthlyIncome } from './src/data/demo';
 import { isCloudConfigured, supabase } from './src/lib/supabase';
 import { AccountScreen } from './src/screens/AccountScreen';
@@ -60,6 +61,8 @@ function BudgetApp({ session }: BudgetAppProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [planEditing, setPlanEditing] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [reviewTransaction, setReviewTransaction] = useState<Transaction | null>(null);
+  const [reviewSaving, setReviewSaving] = useState(false);
 
   const refreshCloudData = useCallback(async () => {
     if (!session) return;
@@ -122,6 +125,38 @@ function BudgetApp({ session }: BudgetAppProps) {
     setIncome(input.income);
     setCategories((current) => current.map((category) => ({ ...category, budget: input.categoryBudgets[category.id] ?? 0 })));
     setPlanEditing(false);
+  };
+
+  const saveTransactionCategory = async (categoryId: string) => {
+    if (!reviewTransaction) return;
+    setReviewSaving(true);
+    try {
+      if (session) await categorizeTransaction(reviewTransaction.id, categoryId);
+
+      const previousCategoryId = reviewTransaction.categoryId;
+      const affectsSpending = reviewTransaction.direction !== 'inflow';
+      setTransactions((current) => current.map((transaction) => (
+        transaction.id === reviewTransaction.id
+          ? { ...transaction, categoryId, needsReview: false }
+          : transaction
+      )));
+      if (affectsSpending && previousCategoryId !== categoryId) {
+        setCategories((current) => current.map((category) => {
+          if (category.id === previousCategoryId) {
+            return { ...category, spent: Math.max(0, category.spent - reviewTransaction.amount) };
+          }
+          if (category.id === categoryId) {
+            return { ...category, spent: category.spent + reviewTransaction.amount };
+          }
+          return category;
+        }));
+      }
+      setReviewTransaction(null);
+    } catch (caught) {
+      Alert.alert('Could not update category', caught instanceof Error ? caught.message : 'Please try again.');
+    } finally {
+      setReviewSaving(false);
+    }
   };
 
   const email = session?.user.email ?? '';
@@ -199,7 +234,14 @@ function BudgetApp({ session }: BudgetAppProps) {
   const screen = (() => {
     switch (activeTab) {
       case 'transactions':
-        return <TransactionsScreen categories={categories} onAdd={() => setAddOpen(true)} transactions={transactions} />;
+        return (
+          <TransactionsScreen
+            categories={categories}
+            onAdd={() => setAddOpen(true)}
+            onReview={setReviewTransaction}
+            transactions={transactions}
+          />
+        );
       case 'plan':
         return <PlanScreen bills={bills} categories={categories} income={income} onEdit={() => setPlanEditing(true)} />;
       case 'connect':
@@ -231,6 +273,13 @@ function BudgetApp({ session }: BudgetAppProps) {
         onClose={() => setAddOpen(false)}
         onSave={addTransaction}
         visible={addOpen}
+      />
+      <ReviewTransactionModal
+        categories={categories}
+        onClose={() => setReviewTransaction(null)}
+        onSave={saveTransactionCategory}
+        saving={reviewSaving}
+        transaction={reviewTransaction}
       />
     </SafeAreaView>
   );

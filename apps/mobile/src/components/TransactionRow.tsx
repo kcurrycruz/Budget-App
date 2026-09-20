@@ -1,5 +1,5 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, spacing } from '../theme';
 import type { Category, Transaction } from '../types';
@@ -8,12 +8,19 @@ import { formatMoney } from '../utils/money';
 type TransactionRowProps = {
   transaction: Transaction;
   category?: Category;
+  onPress?: () => void;
 };
 
-export function TransactionRow({ transaction, category }: TransactionRowProps) {
+export function TransactionRow({ transaction, category, onPress }: TransactionRowProps) {
   const isInflow = transaction.direction === 'inflow';
   return (
-    <View style={styles.row}>
+    <Pressable
+      accessibilityHint={onPress ? 'Opens category selection' : undefined}
+      accessibilityLabel={onPress ? `Review ${transaction.merchant} transaction` : undefined}
+      disabled={!onPress}
+      onPress={onPress}
+      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+    >
       <View style={[styles.icon, { backgroundColor: `${category?.color ?? colors.primary}1A` }]}>
         <MaterialCommunityIcons
           color={category?.color ?? colors.primary}
@@ -30,12 +37,14 @@ export function TransactionRow({ transaction, category }: TransactionRowProps) {
         <Text style={styles.meta}>{category?.name ?? 'Uncategorized'} · {transaction.date}</Text>
       </View>
       <Text style={[styles.amount, isInflow && styles.inflow]}>{isInflow ? '+' : '−'}{formatMoney(transaction.amount, true)}</Text>
-    </View>
+      {onPress ? <MaterialCommunityIcons color={colors.inkMuted} name="chevron-right" size={19} /> : null}
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   row: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.md },
+  rowPressed: { opacity: 0.65 },
   icon: { alignItems: 'center', borderRadius: radius.md, height: 44, justifyContent: 'center', width: 44 },
   copy: { flex: 1, gap: 3 },
   merchantLine: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },

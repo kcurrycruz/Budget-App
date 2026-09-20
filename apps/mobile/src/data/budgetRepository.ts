@@ -192,6 +192,23 @@ export async function createManualTransaction(draft: { merchant: string; amount:
   } satisfies Transaction;
 }
 
+export async function categorizeTransaction(transactionId: string, categoryId: string) {
+  const client = requireClient();
+  const { data, error } = await client
+    .from('transactions')
+    .update({
+      category_id: categoryId,
+      needs_review: false,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', transactionId)
+    .select('id')
+    .single();
+
+  if (error) throw error;
+  if (!data?.id) throw new Error('The transaction could not be updated.');
+}
+
 export async function saveMonthlyPlan(input: {
   bills: number;
   categories: Array<{ id: string; budget: number }>;
