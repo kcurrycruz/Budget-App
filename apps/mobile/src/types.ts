@@ -19,6 +19,15 @@ export type Transaction = {
   pending?: boolean;
 };
 
+export type ManualTransactionDraft = {
+  amount: number;
+  categoryId: string;
+  direction: 'outflow' | 'inflow';
+  merchant: string;
+  note: string;
+  transactionDate: string;
+};
+
 export type Account = {
   id: string;
   name: string;

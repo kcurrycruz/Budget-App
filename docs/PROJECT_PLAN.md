@@ -68,3 +68,4 @@ Record decisions here with the date, decision, and reason. Move longer technical
 - 2026-09-19: EAS Hosting provides the beta's stable HTTPS production address at `https://kcurry-budget.expo.app`; Supabase Auth uses the same address as its default Site URL.
 - 2026-09-20: Imported transactions use an in-app review queue. Choosing a category clears the review flag and updates monthly category totals without changing Plaid's original transaction identity.
 - 2026-09-20: Treat the current feature set and UI as the private-beta baseline. Future feature additions and UI changes are explicitly expected rather than constrained by the first release layout.
+- 2026-09-20: Manual entry supports both expenses and income, lightweight date and note capture, and explicit save progress. Activity filters must represent real behavior rather than decorative controls.

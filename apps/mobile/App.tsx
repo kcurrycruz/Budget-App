@@ -19,7 +19,8 @@ import { PlanSetupScreen } from './src/screens/PlanSetupScreen';
 import { TransactionsScreen } from './src/screens/TransactionsScreen';
 import { UpdatePasswordScreen } from './src/screens/UpdatePasswordScreen';
 import { colors } from './src/theme';
-import type { AppTab, Transaction } from './src/types';
+import type { AppTab, ManualTransactionDraft, Transaction } from './src/types';
+import { formatActivityDate } from './src/utils/date';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -65,6 +66,7 @@ function BudgetApp({ session }: BudgetAppProps) {
   const [dataLoading, setDataLoading] = useState(cloudMode);
   const [dataError, setDataError] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [addSaving, setAddSaving] = useState(false);
   const [planEditing, setPlanEditing] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [reviewTransaction, setReviewTransaction] = useState<Transaction | null>(null);
@@ -92,8 +94,9 @@ function BudgetApp({ session }: BudgetAppProps) {
     void refreshCloudData();
   }, [refreshCloudData]);
 
-  const addTransaction = async (draft: { merchant: string; amount: number; categoryId: string }) => {
+  const addTransaction = async (draft: ManualTransactionDraft) => {
     let transaction: Transaction;
+    setAddSaving(true);
     try {
       transaction = session
         ? await createManualTransaction(draft)
@@ -102,20 +105,25 @@ function BudgetApp({ session }: BudgetAppProps) {
             merchant: draft.merchant,
             amount: draft.amount,
             categoryId: draft.categoryId,
-            date: 'Today',
+            direction: draft.direction,
+            date: formatActivityDate(draft.transactionDate),
             account: 'Manual entry',
           };
     } catch (caught) {
-      Alert.alert('Could not save expense', caught instanceof Error ? caught.message : 'Please try again.');
+      Alert.alert('Could not save transaction', caught instanceof Error ? caught.message : 'Please try again.');
       return;
+    } finally {
+      setAddSaving(false);
     }
 
     setTransactions((current) => [transaction, ...current]);
-    setCategories((current) => current.map((category) => (
-      category.id === draft.categoryId
-        ? { ...category, spent: category.spent + draft.amount }
-        : category
-    )));
+    if (draft.direction === 'outflow') {
+      setCategories((current) => current.map((category) => (
+        category.id === draft.categoryId
+          ? { ...category, spent: category.spent + draft.amount }
+          : category
+      )));
+    }
     setAddOpen(false);
   };
 
@@ -278,6 +286,7 @@ function BudgetApp({ session }: BudgetAppProps) {
         categories={categories}
         onClose={() => setAddOpen(false)}
         onSave={addTransaction}
+        saving={addSaving}
         visible={addOpen}
       />
       <ReviewTransactionModal

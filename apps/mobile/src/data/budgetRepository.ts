@@ -1,7 +1,8 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
 
 import { supabase } from '../lib/supabase';
-import type { Account, Category, Transaction } from '../types';
+import type { Account, Category, ManualTransactionDraft, Transaction } from '../types';
+import { formatActivityDate, toDateOnly } from '../utils/date';
 
 export type CloudBudgetData = {
   accounts: Account[];
@@ -43,36 +44,11 @@ type TransactionRow = {
   pending: boolean;
 };
 
-const toDateOnly = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
 const getMonthBounds = () => {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
   const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   return { start: toDateOnly(start), end: toDateOnly(end) };
-};
-
-const formatActivityDate = (dateOnly: string) => {
-  const [year, month, day] = dateOnly.split('-').map(Number);
-  if (!year || !month || !day) return dateOnly;
-
-  const date = new Date(year, month - 1, day);
-  const today = new Date();
-  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
-  const isSameDay = (left: Date, right: Date) => (
-    left.getFullYear() === right.getFullYear()
-    && left.getMonth() === right.getMonth()
-    && left.getDate() === right.getDate()
-  );
-
-  if (isSameDay(date, today)) return 'Today';
-  if (isSameDay(date, yesterday)) return 'Yesterday';
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
 const requireClient = () => {
@@ -166,17 +142,18 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
   };
 }
 
-export async function createManualTransaction(draft: { merchant: string; amount: number; categoryId: string }) {
+export async function createManualTransaction(draft: ManualTransactionDraft) {
   const client = requireClient();
   const { data, error } = await client
     .from('transactions')
     .insert({
       merchant_name: draft.merchant,
       amount: draft.amount,
-      direction: 'outflow',
-      category_id: draft.categoryId,
-      transaction_date: toDateOnly(new Date()),
+      direction: draft.direction,
+      category_id: draft.direction === 'outflow' ? draft.categoryId : null,
+      transaction_date: draft.transactionDate,
       source: 'manual',
+      note: draft.note || null,
     })
     .select('id, merchant_name, category_id, amount, direction, needs_review, transaction_date, pending')
     .single();
@@ -186,7 +163,7 @@ export async function createManualTransaction(draft: { merchant: string; amount:
   return {
     id: data.id as string,
     merchant: data.merchant_name as string,
-    categoryId: data.category_id as string,
+    categoryId: (data.category_id as string | null) ?? '',
     amount: Number(data.amount),
     direction: data.direction as 'outflow' | 'inflow',
     needsReview: Boolean(data.needs_review),

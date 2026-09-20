@@ -13,6 +13,7 @@ type TransactionRowProps = {
 
 export function TransactionRow({ transaction, category, onPress }: TransactionRowProps) {
   const isInflow = transaction.direction === 'inflow';
+  const displayCategory = isInflow ? 'Income' : category?.name ?? 'Uncategorized';
   return (
     <Pressable
       accessibilityHint={onPress ? 'Opens category selection' : undefined}
@@ -21,10 +22,10 @@ export function TransactionRow({ transaction, category, onPress }: TransactionRo
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
     >
-      <View style={[styles.icon, { backgroundColor: `${category?.color ?? colors.primary}1A` }]}>
+      <View style={[styles.icon, { backgroundColor: `${isInflow ? colors.primary : category?.color ?? colors.primary}1A` }]}>
         <MaterialCommunityIcons
-          color={category?.color ?? colors.primary}
-          name={(category?.icon as keyof typeof MaterialCommunityIcons.glyphMap) ?? 'cash'}
+          color={isInflow ? colors.primary : category?.color ?? colors.primary}
+          name={isInflow ? 'cash-plus' : (category?.icon as keyof typeof MaterialCommunityIcons.glyphMap) ?? 'cash'}
           size={21}
         />
       </View>
@@ -34,7 +35,7 @@ export function TransactionRow({ transaction, category, onPress }: TransactionRo
           {transaction.pending ? <Text style={styles.pending}>Pending</Text> : null}
           {transaction.needsReview ? <Text style={styles.review}>Review</Text> : null}
         </View>
-        <Text style={styles.meta}>{category?.name ?? 'Uncategorized'} · {transaction.date}</Text>
+        <Text style={styles.meta}>{displayCategory} · {transaction.date}</Text>
       </View>
       <Text style={[styles.amount, isInflow && styles.inflow]}>{isInflow ? '+' : '−'}{formatMoney(transaction.amount, true)}</Text>
       {onPress ? <MaterialCommunityIcons color={colors.inkMuted} name="chevron-right" size={19} /> : null}
