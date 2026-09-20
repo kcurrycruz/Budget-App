@@ -50,7 +50,8 @@ Plaid Link for web runs in supported iPhone browsers and is used by the installa
 - The endpoint verifies Plaid's ES256 signature, five-minute freshness window, and exact raw-body SHA-256 before accepting an event.
 - Verified events are stored in a server-only receipt table. Transaction update events run incremental sync in a Supabase background task, while Item errors flag the connection for repair in the app.
 - Failed processing is retried every five minutes with exponential backoff. Queue claims use row locking to prevent duplicates, the scheduler credential is generated inside Supabase Vault, and repeated failures flag the affected connection and write an operational error log.
+- Daily maintenance keeps successful or ignored receipts for 30 days, terminal failures for 90 days, and Cron run history for 7 days. Deletes are indexed and bounded to keep maintenance transactions short.
 
 ## Next hardening milestone
 
-Add retention and cleanup policies for old processed webhook receipts, then add production monitoring before moving Plaid out of Sandbox.
+Add production monitoring and alert delivery before moving Plaid out of Sandbox. Supabase leaked-password screening can be enabled after upgrading from the Free plan; the app already requires at least eight characters for new account passwords.
