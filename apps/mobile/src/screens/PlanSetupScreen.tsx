@@ -38,11 +38,12 @@ export function PlanSetupScreen({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const totalPlanned = useMemo(() => (
-    Number(bills || 0) + Object.values(categoryBudgets).reduce((sum, value) => sum + Number(value || 0), 0)
-  ), [bills, categoryBudgets]);
+  const flexiblePlanned = useMemo(() => (
+    Object.values(categoryBudgets).reduce((sum, value) => sum + Number(value || 0), 0)
+  ), [categoryBudgets]);
+  const totalPlanned = Number(bills || 0) + flexiblePlanned;
   const numericIncome = Number(income);
-  const canSave = Number.isFinite(numericIncome) && numericIncome > 0 && !busy;
+  const canSave = Number.isFinite(numericIncome) && numericIncome > 0 && flexiblePlanned > 0 && !busy;
 
   const save = async () => {
     if (!canSave) return;
@@ -126,6 +127,8 @@ export function PlanSetupScreen({
           <Text style={styles.summaryValue}>${totalPlanned.toLocaleString('en-US', { maximumFractionDigits: 2 })}</Text>
         </View>
 
+        {flexiblePlanned === 0 ? <Text style={styles.setupHint}>Add at least one flexible spending limit to continue.</Text> : null}
+
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <Pressable disabled={!canSave} onPress={() => { void save(); }} style={[styles.saveButton, !canSave && styles.disabled]}>
           {busy ? <ActivityIndicator color={colors.white} /> : <Text style={styles.saveText}>Save my plan</Text>}
@@ -182,6 +185,7 @@ const styles = StyleSheet.create({
   summary: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.md, flexDirection: 'row', justifyContent: 'space-between', padding: spacing.lg },
   summaryLabel: { color: colors.primaryDark, fontSize: 13, fontWeight: '800' },
   summaryValue: { color: colors.primaryDark, fontSize: 19, fontWeight: '800' },
+  setupHint: { color: colors.inkMuted, fontSize: 12, lineHeight: 18, textAlign: 'center' },
   error: { color: colors.danger, fontSize: 12, lineHeight: 18 },
   saveButton: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: radius.md, height: 56, justifyContent: 'center' },
   saveText: { color: colors.white, fontSize: 16, fontWeight: '800' },
