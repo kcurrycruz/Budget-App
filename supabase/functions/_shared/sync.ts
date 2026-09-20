@@ -73,6 +73,7 @@ export async function upsertAccounts(
     current_balance: account.balances.current,
     available_balance: account.balances.available,
     currency_code: account.balances.iso_currency_code ?? 'USD',
+    connection_status: 'healthy',
     last_synced_at: now,
     disconnected_at: null,
     updated_at: now,

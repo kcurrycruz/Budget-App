@@ -92,10 +92,12 @@ export function ConnectScreen({ accounts, cloudMode, onAccountsChanged }: Connec
               <View style={styles.accountCopy}>
                 <Text style={styles.accountName}>{account.name}</Text>
                 <Text style={styles.accountMeta}>{account.institution} · •••• {account.mask}</Text>
-                <Text style={styles.syncMeta}>Updated {account.syncedAt}</Text>
+                <Text style={[styles.syncMeta, account.connectionStatus === 'attention' && styles.syncMetaAttention]}>
+                  {account.connectionStatus === 'attention' ? 'Connection needs attention' : `Updated ${account.syncedAt}`}
+                </Text>
               </View>
               <Text style={styles.accountBalance}>{formatMoney(account.balance, true)}</Text>
-              {account.connectionId ? <MaterialCommunityIcons color={colors.inkMuted} name="chevron-right" size={20} /> : null}
+              {account.connectionId ? <MaterialCommunityIcons color={account.connectionStatus === 'attention' ? colors.danger : colors.inkMuted} name="chevron-right" size={20} /> : null}
             </Pressable>
             {index < accounts.length - 1 ? <View style={styles.divider} /> : null}
           </View>
@@ -154,6 +156,7 @@ const styles = StyleSheet.create({
   accountName: { color: colors.ink, fontSize: 14, fontWeight: '800' },
   accountMeta: { color: colors.inkMuted, fontSize: 11 },
   syncMeta: { color: colors.primary, fontSize: 10, fontWeight: '700', marginTop: 2 },
+  syncMetaAttention: { color: colors.danger },
   accountBalance: { color: colors.ink, fontSize: 14, fontWeight: '800' },
   divider: { backgroundColor: colors.border, height: StyleSheet.hairlineWidth, marginLeft: 58 },
   syncButton: { alignItems: 'center', alignSelf: 'center', flexDirection: 'row', gap: spacing.sm, padding: spacing.md },

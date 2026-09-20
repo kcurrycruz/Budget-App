@@ -62,6 +62,16 @@ export function ManageConnectionModal({
           </Text>
         </View>
 
+        {account.connectionStatus === 'attention' ? (
+          <View style={styles.attentionCard}>
+            <MaterialCommunityIcons color={colors.danger} name="alert-circle-outline" size={22} />
+            <View style={styles.attentionCopy}>
+              <Text style={styles.attentionTitle}>Connection needs attention</Text>
+              <Text style={styles.attentionText}>Repair this connection to keep balances and transactions updating automatically.</Text>
+            </View>
+          </View>
+        ) : null}
+
         <View style={styles.actionBlock}>
           <Text style={styles.actionTitle}>Having trouble syncing?</Text>
           <Text style={styles.actionText}>Open Plaid again to renew permission or update your bank login. Your existing history stays in the budget.</Text>
@@ -127,6 +137,10 @@ const styles = StyleSheet.create({
   accountName: { color: colors.inkMuted, fontSize: 13, marginTop: spacing.xs },
   connectionMeta: { color: colors.primary, fontSize: 11, fontWeight: '700', marginTop: spacing.sm },
   actionBlock: { gap: spacing.sm },
+  attentionCard: { alignItems: 'flex-start', backgroundColor: '#FFF1F1', borderColor: '#E8BBBB', borderRadius: radius.md, borderWidth: 1, flexDirection: 'row', gap: spacing.md, padding: spacing.lg },
+  attentionCopy: { flex: 1, gap: spacing.xs },
+  attentionTitle: { color: colors.danger, fontSize: 14, fontWeight: '800' },
+  attentionText: { color: '#7F3333', fontSize: 12, lineHeight: 18 },
   actionTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
   dangerTitle: { color: colors.danger, fontSize: 16, fontWeight: '800' },
   actionText: { color: colors.inkMuted, fontSize: 13, lineHeight: 20 },

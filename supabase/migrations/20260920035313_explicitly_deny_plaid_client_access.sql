@@ -4,6 +4,7 @@ create policy "Clients cannot access Plaid credentials"
   on public.plaid_items for all to authenticated
   using (false)
   with check (false);
+
 create policy "Clients cannot access Plaid sync state"
   on public.plaid_sync_state for all to authenticated
   using (false)

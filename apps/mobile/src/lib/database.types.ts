@@ -104,6 +104,7 @@ export type Database = {
           account_type: string
           available_balance: number | null
           created_at: string
+          connection_status: string
           currency_code: string
           current_balance: number | null
           disconnected_at: string | null
@@ -121,6 +122,7 @@ export type Database = {
           account_type: string
           available_balance?: number | null
           created_at?: string
+          connection_status?: string
           currency_code?: string
           current_balance?: number | null
           disconnected_at?: string | null
@@ -138,6 +140,7 @@ export type Database = {
           account_type?: string
           available_balance?: number | null
           created_at?: string
+          connection_status?: string
           currency_code?: string
           current_balance?: number | null
           disconnected_at?: string | null

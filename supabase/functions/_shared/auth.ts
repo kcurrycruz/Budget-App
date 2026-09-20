@@ -18,6 +18,17 @@ const readNamedKey = (modernName: string, legacyName: string) => {
   return Deno.env.get(legacyName);
 };
 
+export const createAdminClient = () => {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const secretKey = readNamedKey('SUPABASE_SECRET_KEYS', 'SUPABASE_SERVICE_ROLE_KEY');
+  if (!supabaseUrl || !secretKey) {
+    throw new Response(JSON.stringify({ error: 'Server configuration is incomplete' }), { status: 500 });
+  }
+  return createClient(supabaseUrl, secretKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+};
+
 export async function requireUser(request: Request): Promise<FunctionContext> {
   const authorization = request.headers.get('Authorization');
   const accessToken = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
@@ -25,8 +36,7 @@ export async function requireUser(request: Request): Promise<FunctionContext> {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const publishableKey = readNamedKey('SUPABASE_PUBLISHABLE_KEYS', 'SUPABASE_ANON_KEY');
-  const secretKey = readNamedKey('SUPABASE_SECRET_KEYS', 'SUPABASE_SERVICE_ROLE_KEY');
-  if (!supabaseUrl || !publishableKey || !secretKey) {
+  if (!supabaseUrl || !publishableKey) {
     throw new Response(JSON.stringify({ error: 'Server configuration is incomplete' }), { status: 500 });
   }
 
@@ -37,9 +47,7 @@ export async function requireUser(request: Request): Promise<FunctionContext> {
   if (error || !user) throw new Response(JSON.stringify({ error: 'Authentication required' }), { status: 401 });
 
   return {
-    admin: createClient(supabaseUrl, secretKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    }),
+    admin: createAdminClient(),
     user,
   };
 }

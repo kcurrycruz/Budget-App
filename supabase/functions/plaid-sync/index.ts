@@ -2,7 +2,7 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 
 import { requireUser } from '../_shared/auth.ts';
 import { errorMessage, handlePreflight, json } from '../_shared/http.ts';
-import { decryptAccessToken, PlaidApiError } from '../_shared/plaid.ts';
+import { configurePlaidWebhook, decryptAccessToken, PlaidApiError } from '../_shared/plaid.ts';
 import { syncPlaidItem, type PlaidItemRow } from '../_shared/sync.ts';
 
 Deno.serve(async (request) => {
@@ -23,7 +23,11 @@ Deno.serve(async (request) => {
     const results = [];
     for (const item of items as PlaidItemRow[]) {
       try {
-        results.push({ itemId: item.id, ...(await syncPlaidItem(admin, item, await decryptAccessToken(item.access_token_ciphertext))) });
+        const accessToken = await decryptAccessToken(item.access_token_ciphertext);
+        await configurePlaidWebhook(accessToken).catch((caught) => {
+          console.error('Could not configure Plaid webhook', item.id, errorMessage(caught));
+        });
+        results.push({ itemId: item.id, ...(await syncPlaidItem(admin, item, accessToken)) });
       } catch (caught) {
         const message = errorMessage(caught);
         await admin.from('plaid_sync_state').update({
@@ -32,13 +36,15 @@ Deno.serve(async (request) => {
         }).eq('plaid_item_id', item.id);
         if (caught instanceof PlaidApiError && caught.code === 'ITEM_LOGIN_REQUIRED') {
           await admin.from('plaid_items').update({ status: 'login_required', updated_at: new Date().toISOString() }).eq('id', item.id);
+          await admin.from('financial_accounts').update({ connection_status: 'attention', updated_at: new Date().toISOString() }).eq('plaid_item_id', item.id);
         }
         results.push({ itemId: item.id, error: message });
       }
     }
 
     const succeeded = results.filter((result) => !('error' in result)).length;
-    if (succeeded === 0) return json({ error: results[0]?.error ?? 'No accounts could be synced.', results }, 502);
+    const firstError = results[0] && 'error' in results[0] ? results[0].error : undefined;
+    if (succeeded === 0) return json({ error: firstError ?? 'No accounts could be synced.', results }, 502);
     return json({ syncedItems: succeeded, results });
   } catch (caught) {
     if (caught instanceof Response) {

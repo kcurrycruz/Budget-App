@@ -2,7 +2,7 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 
 import { requireUser } from '../_shared/auth.ts';
 import { errorMessage, handlePreflight, json } from '../_shared/http.ts';
-import { decryptAccessToken, PlaidApiError, plaidPost } from '../_shared/plaid.ts';
+import { decryptAccessToken, PlaidApiError, plaidPost, plaidWebhookUrl } from '../_shared/plaid.ts';
 
 type LinkTokenResponse = { expiration: string; link_token: string };
 
@@ -44,6 +44,7 @@ Deno.serve(async (request) => {
       ...baseRequest,
       products: ['transactions'],
       transactions: { days_requested: 180 },
+      webhook: plaidWebhookUrl(),
     });
     return json({ linkToken: response.link_token, expiration: response.expiration, updateMode: false });
   } catch (caught) {

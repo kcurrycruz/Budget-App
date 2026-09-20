@@ -95,3 +95,16 @@ export async function plaidPost<T>(path: string, body: Record<string, unknown>):
   }
   return payload as T;
 }
+
+export const plaidWebhookUrl = () => {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  if (!supabaseUrl) throw new PlaidApiError('The Plaid webhook URL is not configured.', 'PLAID_NOT_CONFIGURED');
+  return `${supabaseUrl.replace(/\/$/, '')}/functions/v1/plaid-webhook`;
+};
+
+export async function configurePlaidWebhook(accessToken: string) {
+  await plaidPost<{ request_id: string }>('/item/webhook/update', {
+    access_token: accessToken,
+    webhook: plaidWebhookUrl(),
+  });
+}

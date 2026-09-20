@@ -44,6 +44,12 @@ Plaid Link for web runs in supported iPhone browsers and is used by the installa
 - Disconnect calls Plaid `/item/remove` first, then replaces the stored credential with an unusable encrypted marker and marks every account from that Item as disconnected.
 - Imported transactions are retained after disconnect so past budgets do not change unexpectedly.
 
+## Automatic updates
+
+- New Items register the hosted `plaid-webhook` endpoint, and existing Items are registered again during manual sync or connection repair.
+- The endpoint verifies Plaid's ES256 signature, five-minute freshness window, and exact raw-body SHA-256 before accepting an event.
+- Verified events are stored in a server-only receipt table. Transaction update events run incremental sync in a Supabase background task, while Item errors flag the connection for repair in the app.
+
 ## Next hardening milestone
 
-Add a verified Plaid webhook endpoint for automatic background sync and surface pending-expiration events before a connection stops updating.
+Add a scheduled recovery worker for verified webhook events that remain failed after the background task limit, plus operational alerting for repeated failures.

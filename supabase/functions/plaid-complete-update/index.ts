@@ -2,7 +2,7 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 
 import { requireUser } from '../_shared/auth.ts';
 import { errorMessage, handlePreflight, json } from '../_shared/http.ts';
-import { decryptAccessToken, PlaidApiError } from '../_shared/plaid.ts';
+import { configurePlaidWebhook, decryptAccessToken, PlaidApiError } from '../_shared/plaid.ts';
 import { syncPlaidItem, type PlaidItemRow } from '../_shared/sync.ts';
 
 Deno.serve(async (request) => {
@@ -26,11 +26,11 @@ Deno.serve(async (request) => {
     if (!item) return json({ error: 'Connection not found.' }, 404);
     if (item.status === 'disconnected') return json({ error: 'This connection has been disconnected.' }, 409);
 
-    const result = await syncPlaidItem(
-      admin,
-      item as PlaidItemRow,
-      await decryptAccessToken(item.access_token_ciphertext as string),
-    );
+    const accessToken = await decryptAccessToken(item.access_token_ciphertext as string);
+    await configurePlaidWebhook(accessToken).catch((caught) => {
+      console.error('Could not configure Plaid webhook', item.id, errorMessage(caught));
+    });
+    const result = await syncPlaidItem(admin, item as PlaidItemRow, accessToken);
     const { error: updateError } = await admin
       .from('plaid_items')
       .update({ status: 'active', updated_at: new Date().toISOString() })
