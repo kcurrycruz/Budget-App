@@ -28,6 +28,17 @@ Build a phone-first budget app that makes entering financial information and und
 - Whether recurring bills should be detected automatically or entered manually first.
 - Authentication, data-retention, deletion, and support requirements.
 
+## Future feature and UI backlog
+
+The current private beta is a foundation, not a locked final design. Continue adding features and refining the phone UI as real usage reveals what makes budgeting faster and clearer.
+
+- Recurring bills, subscriptions, and expected-income reminders.
+- Spreadsheet history import and easier bulk editing.
+- Smarter transaction categories and reusable merchant rules.
+- More useful cash-flow trends, monthly comparisons, and goal tracking.
+- Continued navigation, typography, spacing, accessibility, and visual-polish iterations.
+- Native iPhone-specific improvements after the custom development build is introduced.
+
 ## Technical direction
 
 - Client: Expo SDK 57 with React Native and TypeScript.
@@ -56,3 +67,4 @@ Record decisions here with the date, decision, and reason. Move longer technical
 - 2026-09-19: The free private beta will ship as an installable HTTPS web app. Native iOS distribution can follow when an Apple Developer Program membership is justified.
 - 2026-09-19: EAS Hosting provides the beta's stable HTTPS production address at `https://kcurry-budget.expo.app`; Supabase Auth uses the same address as its default Site URL.
 - 2026-09-20: Imported transactions use an in-app review queue. Choosing a category clears the review flag and updates monthly category totals without changing Plaid's original transaction identity.
+- 2026-09-20: Treat the current feature set and UI as the private-beta baseline. Future feature additions and UI changes are explicitly expected rather than constrained by the first release layout.

@@ -17,12 +17,14 @@ import { LoadingScreen } from './src/screens/LoadingScreen';
 import { PlanScreen } from './src/screens/PlanScreen';
 import { PlanSetupScreen } from './src/screens/PlanSetupScreen';
 import { TransactionsScreen } from './src/screens/TransactionsScreen';
+import { UpdatePasswordScreen } from './src/screens/UpdatePasswordScreen';
 import { colors } from './src/theme';
 import type { AppTab, Transaction } from './src/types';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(isCloudConfigured);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -32,7 +34,8 @@ export default function App() {
       setAuthLoading(false);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
       setSession(nextSession);
       setAuthLoading(false);
     });
@@ -42,6 +45,9 @@ export default function App() {
 
   if (authLoading) return <LoadingScreen />;
   if (isCloudConfigured && !session) return <AuthScreen />;
+  if (isCloudConfigured && session && passwordRecovery) {
+    return <UpdatePasswordScreen onComplete={() => setPasswordRecovery(false)} />;
+  }
 
   return <BudgetApp session={session} />;
 }

@@ -12,10 +12,10 @@ import {
   View,
 } from 'react-native';
 
-import { supabase } from '../lib/supabase';
+import { passwordResetRedirectUrl, supabase } from '../lib/supabase';
 import { colors, radius, shadow, spacing } from '../theme';
 
-type AuthMode = 'signIn' | 'signUp';
+type AuthMode = 'reset' | 'signIn' | 'signUp';
 
 export function AuthScreen() {
   const [mode, setMode] = useState<AuthMode>('signIn');
@@ -27,12 +27,16 @@ export function AuthScreen() {
   const [isError, setIsError] = useState(false);
 
   const isSignUp = mode === 'signUp';
-  const canSubmit = email.trim().length > 3 && password.length >= 8 && (!isSignUp || fullName.trim().length > 1);
+  const isReset = mode === 'reset';
+  const canSubmit = email.trim().length > 3
+    && (isReset || password.length >= 8)
+    && (!isSignUp || fullName.trim().length > 1);
 
-  const changeMode = () => {
-    setMode((current) => (current === 'signIn' ? 'signUp' : 'signIn'));
+  const changeMode = (nextMode: AuthMode) => {
+    setMode(nextMode);
     setMessage(null);
     setIsError(false);
+    setPassword('');
   };
 
   const submit = async () => {
@@ -41,6 +45,20 @@ export function AuthScreen() {
     setBusy(true);
     setMessage(null);
     setIsError(false);
+
+    if (isReset) {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        ...(passwordResetRedirectUrl ? { redirectTo: passwordResetRedirectUrl } : {}),
+      });
+      setBusy(false);
+      if (error) {
+        setIsError(true);
+        setMessage(error.message);
+        return;
+      }
+      setMessage('If an account exists for this email, a secure reset link is on the way.');
+      return;
+    }
 
     const result = isSignUp
       ? await supabase.auth.signUp({
@@ -71,9 +89,13 @@ export function AuthScreen() {
         </View>
         <View style={styles.intro}>
           <Text style={styles.eyebrow}>YOUR MONEY, MADE CLEAR</Text>
-          <Text style={styles.title}>{isSignUp ? 'Create your private budget' : 'Welcome back'}</Text>
+          <Text style={styles.title}>
+            {isReset ? 'Reset your password' : isSignUp ? 'Create your private budget' : 'Welcome back'}
+          </Text>
           <Text style={styles.detail}>
-            {isSignUp
+            {isReset
+              ? 'Enter your email and we’ll send a secure link to choose a new password.'
+              : isSignUp
               ? 'Your transactions and plans stay separate from every other account.'
               : 'Sign in to see your budget on any device.'}
           </Text>
@@ -109,19 +131,26 @@ export function AuthScreen() {
             />
           </View>
 
-          <View style={styles.field}>
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              autoCapitalize="none"
-              autoComplete={isSignUp ? 'new-password' : 'current-password'}
-              onChangeText={setPassword}
-              placeholder="At least 8 characters"
-              placeholderTextColor={colors.inkMuted}
-              secureTextEntry
-              style={styles.input}
-              value={password}
-            />
-          </View>
+          {!isReset ? (
+            <View style={styles.field}>
+              <Text style={styles.label}>Password</Text>
+              <TextInput
+                autoCapitalize="none"
+                autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                onChangeText={setPassword}
+                placeholder="At least 8 characters"
+                placeholderTextColor={colors.inkMuted}
+                secureTextEntry
+                style={styles.input}
+                value={password}
+              />
+              {!isSignUp ? (
+                <Pressable onPress={() => changeMode('reset')} style={styles.forgotButton}>
+                  <Text style={styles.forgotText}>Forgot password?</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
 
           {message ? (
             <View style={[styles.message, isError ? styles.errorMessage : styles.successMessage]}>
@@ -139,16 +168,28 @@ export function AuthScreen() {
             onPress={submit}
             style={[styles.primaryButton, (!canSubmit || busy) && styles.buttonDisabled]}
           >
-            {busy ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryButtonText}>{isSignUp ? 'Create account' : 'Sign in'}</Text>}
+            {busy ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <Text style={styles.primaryButtonText}>
+                {isReset ? 'Send reset link' : isSignUp ? 'Create account' : 'Sign in'}
+              </Text>
+            )}
           </Pressable>
         </View>
 
-        <Pressable onPress={changeMode} style={styles.switchButton}>
-          <Text style={styles.switchText}>
-            {isSignUp ? 'Already have an account? ' : 'New here? '}
-            <Text style={styles.switchLink}>{isSignUp ? 'Sign in' : 'Create an account'}</Text>
-          </Text>
-        </Pressable>
+        {isReset ? (
+          <Pressable onPress={() => changeMode('signIn')} style={styles.switchButton}>
+            <Text style={styles.switchLink}>Back to sign in</Text>
+          </Pressable>
+        ) : (
+          <Pressable onPress={() => changeMode(isSignUp ? 'signIn' : 'signUp')} style={styles.switchButton}>
+            <Text style={styles.switchText}>
+              {isSignUp ? 'Already have an account? ' : 'New here? '}
+              <Text style={styles.switchLink}>{isSignUp ? 'Sign in' : 'Create an account'}</Text>
+            </Text>
+          </Pressable>
+        )}
 
         <View style={styles.privacyRow}>
           <MaterialCommunityIcons color={colors.primary} name="shield-lock-outline" size={18} />
@@ -171,6 +212,8 @@ const styles = StyleSheet.create({
   field: { gap: spacing.sm },
   label: { color: colors.ink, fontSize: 13, fontWeight: '800' },
   input: { backgroundColor: colors.background, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, color: colors.ink, fontSize: 16, height: 54, paddingHorizontal: spacing.lg },
+  forgotButton: { alignSelf: 'flex-end', paddingVertical: 2 },
+  forgotText: { color: colors.primary, fontSize: 13, fontWeight: '800' },
   message: { alignItems: 'flex-start', borderRadius: radius.md, flexDirection: 'row', gap: spacing.sm, padding: spacing.md },
   successMessage: { backgroundColor: colors.primarySoft },
   errorMessage: { backgroundColor: '#FBEAEA' },
