@@ -1,5 +1,5 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ProgressBar } from '../components/ProgressBar';
 import { ScreenHeader } from '../components/ScreenHeader';
@@ -11,9 +11,10 @@ type PlanScreenProps = {
   categories: Category[];
   income: number;
   bills: number;
+  onEdit: () => void;
 };
 
-export function PlanScreen({ categories, income, bills }: PlanScreenProps) {
+export function PlanScreen({ categories, income, bills, onEdit }: PlanScreenProps) {
   const flexibleBudget = categories.reduce((sum, category) => sum + category.budget, 0);
   const planned = bills + flexibleBudget;
   const buffer = income - planned;
@@ -21,7 +22,13 @@ export function PlanScreen({ categories, income, bills }: PlanScreenProps) {
 
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <ScreenHeader detail="Give every dollar a simple job." eyebrow="September" title="Monthly plan" />
+      <View style={styles.headerRow}>
+        <ScreenHeader detail="Give every dollar a simple job." eyebrow="September" title="Monthly plan" />
+        <Pressable accessibilityLabel="Edit monthly plan" onPress={onEdit} style={styles.editButton}>
+          <MaterialCommunityIcons color={colors.primaryDark} name="pencil-outline" size={19} />
+          <Text style={styles.editText}>Edit</Text>
+        </Pressable>
+      </View>
 
       <View style={styles.planCard}>
         <View style={styles.planTop}>
@@ -93,6 +100,9 @@ export function PlanScreen({ categories, income, bills }: PlanScreenProps) {
 
 const styles = StyleSheet.create({
   content: { gap: spacing.xl, padding: spacing.lg, paddingBottom: spacing.xxl, paddingTop: spacing.xl },
+  headerRow: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'space-between' },
+  editButton: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.pill, flexDirection: 'row', gap: 5, marginTop: spacing.sm, paddingHorizontal: 12, paddingVertical: 9 },
+  editText: { color: colors.primaryDark, fontSize: 12, fontWeight: '800' },
   planCard: { backgroundColor: colors.primaryDark, borderRadius: radius.lg, gap: spacing.lg, padding: spacing.xl },
   planTop: { flexDirection: 'row', justifyContent: 'space-between' },
   label: { color: '#BFD8C9', fontSize: 12, fontWeight: '700' },

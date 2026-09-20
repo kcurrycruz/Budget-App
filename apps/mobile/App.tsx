@@ -57,6 +57,7 @@ function BudgetApp({ session }: BudgetAppProps) {
   const [dataLoading, setDataLoading] = useState(cloudMode);
   const [dataError, setDataError] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [planEditing, setPlanEditing] = useState(false);
 
   const refreshCloudData = useCallback(async () => {
     if (!session) return;
@@ -118,6 +119,7 @@ function BudgetApp({ session }: BudgetAppProps) {
     setBills(input.bills);
     setIncome(input.income);
     setCategories((current) => current.map((category) => ({ ...category, budget: input.categoryBudgets[category.id] ?? 0 })));
+    setPlanEditing(false);
   };
 
   const email = session?.user.email ?? '';
@@ -152,8 +154,17 @@ function BudgetApp({ session }: BudgetAppProps) {
     );
   }
 
-  if (session && income === 0 && categories.every((category) => category.budget === 0)) {
-    return <PlanSetupScreen categories={categories} onSave={savePlan} />;
+  const needsPlanSetup = session && (income === 0 || categories.every((category) => category.budget === 0));
+  if (session && (needsPlanSetup || planEditing)) {
+    return (
+      <PlanSetupScreen
+        categories={categories}
+        initialBills={bills}
+        initialIncome={income}
+        onCancel={needsPlanSetup ? undefined : () => setPlanEditing(false)}
+        onSave={savePlan}
+      />
+    );
   }
 
   const screen = (() => {
@@ -161,7 +172,7 @@ function BudgetApp({ session }: BudgetAppProps) {
       case 'transactions':
         return <TransactionsScreen categories={categories} onAdd={() => setAddOpen(true)} transactions={transactions} />;
       case 'plan':
-        return <PlanScreen bills={bills} categories={categories} income={income} />;
+        return <PlanScreen bills={bills} categories={categories} income={income} onEdit={() => setPlanEditing(true)} />;
       case 'connect':
         return <ConnectScreen accounts={connectedAccounts} />;
       default:

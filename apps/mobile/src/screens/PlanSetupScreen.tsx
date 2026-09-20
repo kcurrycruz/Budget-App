@@ -17,12 +17,21 @@ import type { Category } from '../types';
 
 type PlanSetupScreenProps = {
   categories: Category[];
+  initialBills?: number;
+  initialIncome?: number;
+  onCancel?: () => void;
   onSave: (input: { bills: number; categoryBudgets: Record<string, number>; income: number }) => Promise<void>;
 };
 
-export function PlanSetupScreen({ categories, onSave }: PlanSetupScreenProps) {
-  const [income, setIncome] = useState('');
-  const [bills, setBills] = useState('');
+export function PlanSetupScreen({
+  categories,
+  initialBills = 0,
+  initialIncome = 0,
+  onCancel,
+  onSave,
+}: PlanSetupScreenProps) {
+  const [income, setIncome] = useState(initialIncome ? String(initialIncome) : '');
+  const [bills, setBills] = useState(initialBills ? String(initialBills) : '');
   const [categoryBudgets, setCategoryBudgets] = useState<Record<string, string>>(() => (
     Object.fromEntries(categories.map((category) => [category.id, category.budget ? String(category.budget) : '']))
   ));
@@ -54,12 +63,18 @@ export function PlanSetupScreen({ categories, onSave }: PlanSetupScreenProps) {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {onCancel ? (
+          <Pressable onPress={onCancel} style={styles.backButton}>
+            <MaterialCommunityIcons color={colors.primaryDark} name="arrow-left" size={19} />
+            <Text style={styles.backText}>Back to plan</Text>
+          </Pressable>
+        ) : null}
         <View style={styles.icon}>
           <MaterialCommunityIcons color={colors.primaryDark} name="calendar-check-outline" size={30} />
         </View>
         <View style={styles.intro}>
-          <Text style={styles.eyebrow}>ONE-TIME SETUP</Text>
-          <Text style={styles.title}>Build your first monthly plan</Text>
+          <Text style={styles.eyebrow}>{onCancel ? 'MONTHLY PLAN' : 'ONE-TIME SETUP'}</Text>
+          <Text style={styles.title}>{onCancel ? 'Adjust your plan' : 'Build your first monthly plan'}</Text>
           <Text style={styles.detail}>Start broad. You can adjust every number later as the app learns your routine.</Text>
         </View>
 
@@ -142,6 +157,8 @@ function MoneyInput({ onChangeText, placeholder, value }: MoneyInputProps) {
 const styles = StyleSheet.create({
   container: { backgroundColor: colors.background, flex: 1 },
   content: { gap: spacing.xl, padding: spacing.xl, paddingBottom: 48 },
+  backButton: { alignItems: 'center', alignSelf: 'flex-start', flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.sm },
+  backText: { color: colors.primaryDark, fontSize: 13, fontWeight: '800' },
   icon: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.md, height: 58, justifyContent: 'center', marginTop: spacing.md, width: 58 },
   intro: { gap: spacing.sm },
   eyebrow: { color: colors.primary, fontSize: 12, fontWeight: '800', letterSpacing: 0.8 },
