@@ -32,7 +32,7 @@ Build a phone-first budget app that makes entering financial information and und
 
 - Client: Expo SDK 57 with React Native and TypeScript.
 - Mobile platforms: iOS and Android from one codebase.
-- Web: reuse domain types and design tokens after the mobile workflow is proven.
+- Web: export the shared Expo client as an installable PWA for the free private beta.
 - Plaid: React Native Link SDK in a custom development build.
 - Server: create Link tokens, exchange public tokens, encrypt access tokens, process webhooks, and normalize transactions.
 - Data: keep imported transaction identity separate from user edits so syncs never overwrite a correction.
@@ -53,3 +53,4 @@ Record decisions here with the date, decision, and reason. Move longer technical
 
 - 2026-09-19: The first private beta will support multiple people with completely separate, private budgets. Shared household budgets are deferred until the personal workflow is proven.
 - 2026-09-19: Supabase Auth, Postgres, and Row Level Security will provide the first multi-user backend. Plaid credentials remain server-only.
+- 2026-09-19: The free private beta will ship as an installable HTTPS web app. Native iOS distribution can follow when an Apple Developer Program membership is justified.

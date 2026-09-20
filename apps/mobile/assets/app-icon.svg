@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title description">
+  <title id="title">Budget App icon</title>
+  <desc id="description">A white wallet with a gold card on a deep green background.</desc>
+  <defs>
+    <linearGradient id="background" x1="128" y1="96" x2="896" y2="928" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1A754C" />
+      <stop offset="1" stop-color="#0F4D31" />
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#background)" />
+  <circle cx="860" cy="166" r="170" fill="#FFFFFF" opacity="0.06" />
+  <rect x="226" y="216" width="572" height="264" rx="58" fill="#F2B84B" transform="rotate(-5 226 216)" />
+  <rect x="150" y="330" width="724" height="430" rx="88" fill="#FFFFFF" />
+  <rect x="584" y="454" width="304" height="176" rx="56" fill="#176B45" />
+  <circle cx="674" cy="542" r="29" fill="#F2B84B" />
+</svg>

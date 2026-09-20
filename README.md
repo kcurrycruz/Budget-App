@@ -4,7 +4,7 @@ A phone-first budget app that makes expense entry, monthly planning, and cash-fl
 
 ## Project status
 
-The first mobile prototype is under active development. It uses sample data until the source spreadsheet is mapped and Plaid's sandbox is connected. Product decisions, architecture notes, and milestones belong in [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md).
+The authenticated budget foundation is working with private Supabase-backed data, editable monthly plans, manual transactions, exports, and account controls. The same Expo client now exports as an installable mobile web app while Plaid Sandbox integration is prepared. Product decisions, architecture notes, and milestones belong in [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md).
 
 ## Repository layout
 
@@ -18,13 +18,21 @@ The first mobile prototype is under active development. It uses sample data unti
 `-- README.md          Project overview
 ```
 
-The mobile app is the first client. A shared API and web client can be added later without placing secrets or Plaid access tokens in the mobile bundle.
+The Expo app serves iOS, Android, and web from one codebase. Secrets and future Plaid access tokens stay in server-side Supabase functions, never in a client bundle.
 
 ## Getting started
 
 1. Install the mobile dependencies with `pnpm --dir apps/mobile install`.
 2. Start the app with `pnpm --dir apps/mobile start`.
 3. Open it in a simulator or an Expo development build.
+
+For the installable web version:
+
+1. Create a production bundle with `pnpm --dir apps/mobile build:web`.
+2. Preview it with `pnpm --dir apps/mobile preview:web`.
+3. Deploy `apps/mobile/dist` to an HTTPS static host.
+
+See [`docs/WEB_APP.md`](docs/WEB_APP.md) for deployment requirements and iPhone installation steps.
 
 Plaid's native React Native SDK is not supported in Expo Go. The current prototype uses a safe connection placeholder; the real integration will use a custom development build and a server-generated Link token.
 

@@ -3,6 +3,7 @@
     "name": "Budget App",
     "slug": "budget-app-mobile",
     "version": "0.1.0",
+    "icon": "./public/icon-1024.png",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
@@ -15,6 +16,16 @@
       "adaptiveIcon": {
         "backgroundColor": "#F5F7F3"
       }
+    },
+    "web": {
+      "bundler": "metro",
+      "description": "A clear, private budget for tracking spending, planning each month, and connecting financial accounts.",
+      "favicon": "./public/icon-192.png",
+      "lang": "en",
+      "name": "Budget App",
+      "output": "single",
+      "shortName": "Budget",
+      "themeColor": "#176B45"
     }
   }
 }

@@ -1,0 +1,25 @@
+{
+  "name": "Budget App",
+  "short_name": "Budget",
+  "description": "A clear, private budget for tracking spending and planning each month.",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#176B45",
+  "background_color": "#F5F7F3"
+}
