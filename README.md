@@ -36,7 +36,7 @@ For the installable web version:
 
 See [`docs/WEB_APP.md`](docs/WEB_APP.md) for deployment requirements and iPhone installation steps.
 
-Plaid's native React Native SDK is not supported in Expo Go. The current prototype uses a safe connection placeholder; the real integration will use a custom development build and a server-generated Link token.
+The web beta includes Plaid Link with server-generated tokens, encrypted server-side access-token storage, and Sandbox transaction syncing. Plaid's native React Native SDK is not supported in Expo Go, so the native connection flow will arrive with the custom development build; the installable web app works in iPhone Safari now.
 
 ## Multi-user cloud setup
 

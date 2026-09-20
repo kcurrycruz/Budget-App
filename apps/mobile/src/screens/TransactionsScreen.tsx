@@ -14,7 +14,9 @@ type TransactionsScreenProps = {
 };
 
 export function TransactionsScreen({ categories, transactions, onAdd }: TransactionsScreenProps) {
-  const total = transactions.reduce((sum, transaction) => sum + transaction.amount, 0);
+  const total = transactions.reduce((sum, transaction) => (
+    transaction.direction === 'inflow' ? sum : sum + transaction.amount
+  ), 0);
 
   return (
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>

@@ -1,3 +1,5 @@
+import { FunctionsHttpError } from '@supabase/supabase-js';
+
 import { supabase } from '../lib/supabase';
 import type { Account, Category, Transaction } from '../types';
 
@@ -33,6 +35,8 @@ type TransactionRow = {
   category_id: string | null;
   financial_account_id: string | null;
   amount: number | string;
+  direction: 'outflow' | 'inflow';
+  needs_review: boolean;
   transaction_date: string;
   pending: boolean;
 };
@@ -74,6 +78,23 @@ const requireClient = () => {
   return supabase;
 };
 
+const invokeFunction = async <T>(name: string, body: Record<string, unknown> = {}) => {
+  const client = requireClient();
+  const { data, error } = await client.functions.invoke<T>(name, { body });
+  if (!error) return data;
+
+  let message = error.message;
+  if (error instanceof FunctionsHttpError) {
+    try {
+      const payload = await error.context.json() as { error?: string };
+      if (payload.error) message = payload.error;
+    } catch {
+      // Keep the SDK message when the response body is not JSON.
+    }
+  }
+  throw new Error(message);
+};
+
 export async function loadCloudBudget(): Promise<CloudBudgetData> {
   const client = requireClient();
   const { start, end } = getMonthBounds();
@@ -82,7 +103,7 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
     client.from('budget_months').select('expected_income, fixed_costs').eq('month', start).maybeSingle(),
     client.from('categories').select('id, name, color, icon, monthly_limit').is('archived_at', null).order('sort_order'),
     client.from('financial_accounts').select('id, display_name, institution_name, mask, account_type, current_balance, last_synced_at').is('disconnected_at', null).order('created_at'),
-    client.from('transactions').select('id, merchant_name, category_id, financial_account_id, amount, transaction_date, pending').gte('transaction_date', start).lt('transaction_date', end).order('transaction_date', { ascending: false }).order('created_at', { ascending: false }),
+    client.from('transactions').select('id, merchant_name, category_id, financial_account_id, amount, direction, needs_review, transaction_date, pending').gte('transaction_date', start).lt('transaction_date', end).order('transaction_date', { ascending: false }).order('created_at', { ascending: false }),
   ]);
 
   const error = monthResult.error ?? categoriesResult.error ?? accountsResult.error ?? transactionsResult.error;
@@ -95,7 +116,7 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
   const spending = new Map<string, number>();
 
   for (const transaction of transactionRows) {
-    if (!transaction.category_id) continue;
+    if (!transaction.category_id || transaction.direction === 'inflow') continue;
     spending.set(transaction.category_id, (spending.get(transaction.category_id) ?? 0) + Number(transaction.amount));
   }
 
@@ -114,7 +135,9 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
     institution: account.institution_name ?? 'Connected account',
     mask: account.mask ?? '—',
     balance: Number(account.current_balance ?? 0),
-    type: account.account_type === 'credit' ? 'credit' : account.account_type === 'savings' ? 'savings' : 'checking',
+    type: ['checking', 'credit', 'savings', 'loan', 'investment', 'other'].includes(account.account_type)
+      ? account.account_type as Account['type']
+      : 'other',
     syncedAt: account.last_synced_at ? new Date(account.last_synced_at).toLocaleString() : 'Not synced yet',
   }));
 
@@ -123,6 +146,8 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
     merchant: transaction.merchant_name,
     categoryId: transaction.category_id ?? '',
     amount: Number(transaction.amount),
+    direction: transaction.direction,
+    needsReview: transaction.needs_review,
     date: formatActivityDate(transaction.transaction_date),
     account: transaction.financial_account_id ? accountNames.get(transaction.financial_account_id) ?? 'Connected account' : 'Manual entry',
     pending: transaction.pending,
@@ -144,11 +169,12 @@ export async function createManualTransaction(draft: { merchant: string; amount:
     .insert({
       merchant_name: draft.merchant,
       amount: draft.amount,
+      direction: 'outflow',
       category_id: draft.categoryId,
       transaction_date: toDateOnly(new Date()),
       source: 'manual',
     })
-    .select('id, merchant_name, category_id, amount, transaction_date, pending')
+    .select('id, merchant_name, category_id, amount, direction, needs_review, transaction_date, pending')
     .single();
 
   if (error) throw error;
@@ -158,6 +184,8 @@ export async function createManualTransaction(draft: { merchant: string; amount:
     merchant: data.merchant_name as string,
     categoryId: data.category_id as string,
     amount: Number(data.amount),
+    direction: data.direction as 'outflow' | 'inflow',
+    needsReview: Boolean(data.needs_review),
     date: formatActivityDate(data.transaction_date as string),
     account: 'Manual entry',
     pending: Boolean(data.pending),
@@ -198,7 +226,7 @@ export async function exportCloudBudget() {
     client.from('budget_months').select('month, expected_income, fixed_costs, created_at, updated_at').order('month'),
     client.from('categories').select('name, color, icon, monthly_limit, sort_order, archived_at, created_at, updated_at').order('sort_order'),
     client.from('financial_accounts').select('display_name, institution_name, mask, account_type, current_balance, currency_code, last_synced_at, disconnected_at, created_at, updated_at').order('created_at'),
-    client.from('transactions').select('merchant_name, amount, transaction_date, pending, source, note, category_id, financial_account_id, created_at, updated_at').order('transaction_date', { ascending: false }),
+    client.from('transactions').select('merchant_name, amount, direction, needs_review, plaid_category_primary, plaid_category_detailed, transaction_date, pending, source, note, category_id, financial_account_id, created_at, updated_at').order('transaction_date', { ascending: false }),
   ]);
 
   const error = profileResult.error ?? monthsResult.error ?? categoriesResult.error ?? accountsResult.error ?? transactionsResult.error;
@@ -212,4 +240,21 @@ export async function exportCloudBudget() {
     financial_accounts: accountsResult.data,
     transactions: transactionsResult.data,
   }, null, 2);
+}
+
+export async function createPlaidLinkToken() {
+  const data = await invokeFunction<{ linkToken: string }>('plaid-create-link-token');
+  if (!data?.linkToken) throw new Error('Plaid did not return a link token.');
+  return data.linkToken;
+}
+
+export async function exchangePlaidPublicToken(publicToken: string, institutionName?: string | null) {
+  return invokeFunction<{ accounts: number; connected: boolean }>('plaid-exchange-public-token', {
+    publicToken,
+    institutionName: institutionName ?? undefined,
+  });
+}
+
+export async function syncPlaidAccounts() {
+  return invokeFunction<{ syncedItems: number }>('plaid-sync');
 }

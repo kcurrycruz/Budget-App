@@ -14,6 +14,8 @@ export type Transaction = {
   amount: number;
   date: string;
   account: string;
+  direction?: 'outflow' | 'inflow';
+  needsReview?: boolean;
   pending?: boolean;
 };
 
@@ -23,7 +25,7 @@ export type Account = {
   institution: string;
   mask: string;
   balance: number;
-  type: 'checking' | 'credit' | 'savings';
+  type: 'checking' | 'credit' | 'savings' | 'loan' | 'investment' | 'other';
   syncedAt: string;
 };
 

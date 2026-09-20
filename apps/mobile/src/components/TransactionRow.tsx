@@ -11,6 +11,7 @@ type TransactionRowProps = {
 };
 
 export function TransactionRow({ transaction, category }: TransactionRowProps) {
+  const isInflow = transaction.direction === 'inflow';
   return (
     <View style={styles.row}>
       <View style={[styles.icon, { backgroundColor: `${category?.color ?? colors.primary}1A` }]}>
@@ -24,10 +25,11 @@ export function TransactionRow({ transaction, category }: TransactionRowProps) {
         <View style={styles.merchantLine}>
           <Text numberOfLines={1} style={styles.merchant}>{transaction.merchant}</Text>
           {transaction.pending ? <Text style={styles.pending}>Pending</Text> : null}
+          {transaction.needsReview ? <Text style={styles.review}>Review</Text> : null}
         </View>
         <Text style={styles.meta}>{category?.name ?? 'Uncategorized'} · {transaction.date}</Text>
       </View>
-      <Text style={styles.amount}>−{formatMoney(transaction.amount, true)}</Text>
+      <Text style={[styles.amount, isInflow && styles.inflow]}>{isInflow ? '+' : '−'}{formatMoney(transaction.amount, true)}</Text>
     </View>
   );
 }
@@ -50,4 +52,6 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   amount: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  inflow: { color: colors.primary },
+  review: { backgroundColor: colors.primarySoft, borderRadius: radius.pill, color: colors.primaryDark, fontSize: 10, fontWeight: '700', overflow: 'hidden', paddingHorizontal: 7, paddingVertical: 3 },
 });

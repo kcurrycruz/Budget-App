@@ -102,6 +102,7 @@ export type Database = {
       financial_accounts: {
         Row: {
           account_type: string
+          available_balance: number | null
           created_at: string
           currency_code: string
           current_balance: number | null
@@ -112,11 +113,13 @@ export type Database = {
           last_synced_at: string | null
           mask: string | null
           plaid_account_id: string | null
+          plaid_item_id: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           account_type: string
+          available_balance?: number | null
           created_at?: string
           currency_code?: string
           current_balance?: number | null
@@ -127,11 +130,13 @@ export type Database = {
           last_synced_at?: string | null
           mask?: string | null
           plaid_account_id?: string | null
+          plaid_item_id?: string | null
           updated_at?: string
           user_id?: string
         }
         Update: {
           account_type?: string
+          available_balance?: number | null
           created_at?: string
           currency_code?: string
           current_balance?: number | null
@@ -142,10 +147,18 @@ export type Database = {
           last_synced_at?: string | null
           mask?: string | null
           plaid_account_id?: string | null
+          plaid_item_id?: string | null
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "financial_accounts_plaid_item_id_fkey"
+            columns: ["plaid_item_id"]
+            isOneToOne: false
+            referencedRelation: "plaid_items"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "financial_accounts_user_id_fkey"
             columns: ["user_id"]
@@ -160,6 +173,7 @@ export type Database = {
           access_token_ciphertext: string
           created_at: string
           id: string
+          institution_id: string | null
           institution_name: string | null
           plaid_item_id: string
           status: string
@@ -170,6 +184,7 @@ export type Database = {
           access_token_ciphertext: string
           created_at?: string
           id?: string
+          institution_id?: string | null
           institution_name?: string | null
           plaid_item_id: string
           status?: string
@@ -180,6 +195,7 @@ export type Database = {
           access_token_ciphertext?: string
           created_at?: string
           id?: string
+          institution_id?: string | null
           institution_name?: string | null
           plaid_item_id?: string
           status?: string
@@ -254,11 +270,15 @@ export type Database = {
           amount: number
           category_id: string | null
           created_at: string
+          direction: string
           financial_account_id: string | null
           id: string
           merchant_name: string
+          needs_review: boolean
           note: string | null
           pending: boolean
+          plaid_category_detailed: string | null
+          plaid_category_primary: string | null
           plaid_transaction_id: string | null
           source: string
           transaction_date: string
@@ -269,11 +289,15 @@ export type Database = {
           amount: number
           category_id?: string | null
           created_at?: string
+          direction?: string
           financial_account_id?: string | null
           id?: string
           merchant_name: string
+          needs_review?: boolean
           note?: string | null
           pending?: boolean
+          plaid_category_detailed?: string | null
+          plaid_category_primary?: string | null
           plaid_transaction_id?: string | null
           source?: string
           transaction_date?: string
@@ -284,11 +308,15 @@ export type Database = {
           amount?: number
           category_id?: string | null
           created_at?: string
+          direction?: string
           financial_account_id?: string | null
           id?: string
           merchant_name?: string
+          needs_review?: boolean
           note?: string | null
           pending?: boolean
+          plaid_category_detailed?: string | null
+          plaid_category_primary?: string | null
           plaid_transaction_id?: string | null
           source?: string
           transaction_date?: string
@@ -334,7 +362,6 @@ export type Database = {
     }
   }
 }
-
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
 
 type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]

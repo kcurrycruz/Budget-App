@@ -1,18 +1,34 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { PlaidConnectButton } from '../components/PlaidConnectButton';
 import { ScreenHeader } from '../components/ScreenHeader';
+import { syncPlaidAccounts } from '../data/budgetRepository';
 import { colors, radius, shadow, spacing } from '../theme';
 import type { Account } from '../types';
 import { formatMoney } from '../utils/money';
 
-type ConnectScreenProps = { accounts: Account[] };
+type ConnectScreenProps = {
+  accounts: Account[];
+  cloudMode: boolean;
+  onAccountsChanged: () => Promise<void>;
+};
 
-export function ConnectScreen({ accounts }: ConnectScreenProps) {
-  const connect = () => Alert.alert(
-    'Plaid sandbox is next',
-    'The interface is ready. We will connect Plaid after the secure server and sandbox credentials are configured.',
-  );
+export function ConnectScreen({ accounts, cloudMode, onAccountsChanged }: ConnectScreenProps) {
+  const [syncing, setSyncing] = useState(false);
+  const sync = async () => {
+    setSyncing(true);
+    try {
+      await syncPlaidAccounts();
+      await onAccountsChanged();
+      Alert.alert('Accounts updated', 'Your latest available balances and transactions are now in the budget.');
+    } catch (caught) {
+      Alert.alert('Could not sync accounts', caught instanceof Error ? caught.message : 'Please try again.');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -24,10 +40,8 @@ export function ConnectScreen({ accounts }: ConnectScreenProps) {
         </View>
         <Text style={styles.heroTitle}>Connect once. Stay current.</Text>
         <Text style={styles.heroText}>Choose your bank or credit card through Plaid. New transactions can flow into your budget automatically.</Text>
-        <Pressable onPress={connect} style={styles.connectButton}>
-          <MaterialCommunityIcons color={colors.white} name="link-variant" size={20} />
-          <Text style={styles.connectButtonText}>Connect an account</Text>
-        </Pressable>
+        <PlaidConnectButton enabled={cloudMode} onConnected={onAccountsChanged} />
+        <Text style={styles.sandboxNote}>Sandbox mode uses test bank data only—no real credentials or money.</Text>
       </View>
 
       <View style={styles.sectionHeader}>
@@ -35,6 +49,12 @@ export function ConnectScreen({ accounts }: ConnectScreenProps) {
         <Text style={styles.sectionMeta}>{accounts.length} accounts</Text>
       </View>
       <View style={styles.accountList}>
+        {accounts.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>No connected accounts yet</Text>
+            <Text style={styles.emptyText}>Connect a Sandbox bank above to see balances and imported activity here.</Text>
+          </View>
+        ) : null}
         {accounts.map((account, index) => (
           <View key={account.id}>
             <View style={styles.accountRow}>
@@ -57,6 +77,13 @@ export function ConnectScreen({ accounts }: ConnectScreenProps) {
         ))}
       </View>
 
+      {accounts.length > 0 && cloudMode ? (
+        <Pressable disabled={syncing} onPress={() => { void sync(); }} style={[styles.syncButton, syncing && styles.syncButtonDisabled]}>
+          <MaterialCommunityIcons color={colors.primaryDark} name="sync" size={19} />
+          <Text style={styles.syncButtonText}>{syncing ? 'Syncing…' : 'Sync latest transactions'}</Text>
+        </Pressable>
+      ) : null}
+
       <View style={styles.safetyCard}>
         <MaterialCommunityIcons color={colors.primaryDark} name="shield-lock-outline" size={25} />
         <View style={styles.safetyCopy}>
@@ -74,12 +101,14 @@ const styles = StyleSheet.create({
   heroIcon: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.lg, height: 62, justifyContent: 'center', marginBottom: spacing.lg, width: 62 },
   heroTitle: { color: colors.ink, fontSize: 23, fontWeight: '800', letterSpacing: -0.4, textAlign: 'center' },
   heroText: { color: colors.inkMuted, fontSize: 14, lineHeight: 21, marginTop: spacing.sm, textAlign: 'center' },
-  connectButton: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: radius.md, flexDirection: 'row', gap: spacing.sm, justifyContent: 'center', marginTop: spacing.xl, padding: spacing.lg, width: '100%' },
-  connectButtonText: { color: colors.white, fontSize: 15, fontWeight: '800' },
+  sandboxNote: { color: colors.inkMuted, fontSize: 11, lineHeight: 16, marginTop: spacing.sm, textAlign: 'center' },
   sectionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   sectionTitle: { color: colors.ink, fontSize: 18, fontWeight: '800' },
   sectionMeta: { color: colors.inkMuted, fontSize: 12, fontWeight: '700' },
   accountList: { backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.lg },
+  emptyState: { alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.xl },
+  emptyTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  emptyText: { color: colors.inkMuted, fontSize: 12, lineHeight: 18, marginTop: spacing.xs, textAlign: 'center' },
   accountRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.lg },
   accountIcon: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.md, height: 46, justifyContent: 'center', width: 46 },
   accountCopy: { flex: 1, gap: 2 },
@@ -88,6 +117,9 @@ const styles = StyleSheet.create({
   syncMeta: { color: colors.primary, fontSize: 10, fontWeight: '700', marginTop: 2 },
   accountBalance: { color: colors.ink, fontSize: 14, fontWeight: '800' },
   divider: { backgroundColor: colors.border, height: StyleSheet.hairlineWidth, marginLeft: 58 },
+  syncButton: { alignItems: 'center', alignSelf: 'center', flexDirection: 'row', gap: spacing.sm, padding: spacing.md },
+  syncButtonDisabled: { opacity: 0.55 },
+  syncButtonText: { color: colors.primaryDark, fontSize: 13, fontWeight: '800' },
   safetyCard: { alignItems: 'flex-start', backgroundColor: colors.primarySoft, borderRadius: radius.md, flexDirection: 'row', gap: spacing.md, padding: spacing.lg },
   safetyCopy: { flex: 1, gap: 4 },
   safetyTitle: { color: colors.primaryDark, fontSize: 14, fontWeight: '800' },

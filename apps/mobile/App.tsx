@@ -203,7 +203,7 @@ function BudgetApp({ session }: BudgetAppProps) {
       case 'plan':
         return <PlanScreen bills={bills} categories={categories} income={income} onEdit={() => setPlanEditing(true)} />;
       case 'connect':
-        return <ConnectScreen accounts={connectedAccounts} />;
+        return <ConnectScreen accounts={connectedAccounts} cloudMode={cloudMode} onAccountsChanged={refreshCloudData} />;
       default:
         return (
           <HomeScreen
