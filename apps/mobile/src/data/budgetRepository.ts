@@ -26,6 +26,7 @@ type AccountRow = {
   mask: string | null;
   account_type: string;
   current_balance: number | string | null;
+  plaid_item_id: string | null;
   last_synced_at: string | null;
 };
 
@@ -102,7 +103,7 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
   const [monthResult, categoriesResult, accountsResult, transactionsResult] = await Promise.all([
     client.from('budget_months').select('expected_income, fixed_costs').eq('month', start).maybeSingle(),
     client.from('categories').select('id, name, color, icon, monthly_limit').is('archived_at', null).order('sort_order'),
-    client.from('financial_accounts').select('id, display_name, institution_name, mask, account_type, current_balance, last_synced_at').is('disconnected_at', null).order('created_at'),
+    client.from('financial_accounts').select('id, display_name, institution_name, mask, account_type, current_balance, plaid_item_id, last_synced_at').is('disconnected_at', null).order('created_at'),
     client.from('transactions').select('id, merchant_name, category_id, financial_account_id, amount, direction, needs_review, transaction_date, pending').gte('transaction_date', start).lt('transaction_date', end).order('transaction_date', { ascending: false }).order('created_at', { ascending: false }),
   ]);
 
@@ -135,6 +136,7 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
     institution: account.institution_name ?? 'Connected account',
     mask: account.mask ?? '—',
     balance: Number(account.current_balance ?? 0),
+    connectionId: account.plaid_item_id ?? undefined,
     type: ['checking', 'credit', 'savings', 'loan', 'investment', 'other'].includes(account.account_type)
       ? account.account_type as Account['type']
       : 'other',
@@ -259,10 +261,18 @@ export async function exportCloudBudget() {
   }, null, 2);
 }
 
-export async function createPlaidLinkToken() {
-  const data = await invokeFunction<{ linkToken: string }>('plaid-create-link-token');
+export async function createPlaidLinkToken(itemId?: string) {
+  const data = await invokeFunction<{ linkToken: string }>('plaid-create-link-token', itemId ? { itemId } : {});
   if (!data?.linkToken) throw new Error('Plaid did not return a link token.');
   return data.linkToken;
+}
+
+export async function completePlaidUpdate(itemId: string) {
+  return invokeFunction<{ repaired: boolean }>('plaid-complete-update', { itemId });
+}
+
+export async function disconnectPlaidItem(itemId: string) {
+  return invokeFunction<{ disconnected: boolean; disconnectedAccounts: number }>('plaid-disconnect', { itemId });
 }
 
 export async function exchangePlaidPublicToken(publicToken: string, institutionName?: string | null) {

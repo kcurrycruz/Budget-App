@@ -25,6 +25,7 @@ export type Account = {
   institution: string;
   mask: string;
   balance: number;
+  connectionId?: string;
   type: 'checking' | 'credit' | 'savings' | 'loan' | 'investment' | 'other';
   syncedAt: string;
 };

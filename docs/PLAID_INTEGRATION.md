@@ -38,6 +38,12 @@ Sandbox Link uses test data only. Plaid's standard Sandbox credential is `user_g
 
 Plaid Link for web runs in supported iPhone browsers and is used by the installable web beta. Plaid's React Native SDK contains native code and does not run in Expo Go, so a custom Expo development build is still required before the same flow can be added to the native binary.
 
+## Connection lifecycle
+
+- Account settings launch Link update mode with the existing server-side access token. The token is unchanged and no public-token exchange is repeated.
+- Disconnect calls Plaid `/item/remove` first, then replaces the stored credential with an unusable encrypted marker and marks every account from that Item as disconnected.
+- Imported transactions are retained after disconnect so past budgets do not change unexpectedly.
+
 ## Next hardening milestone
 
-Add a verified Plaid webhook endpoint for automatic background sync, Link update mode for expired credentials, and an explicit disconnect flow that calls `/item/remove` before deleting local connection records.
+Add a verified Plaid webhook endpoint for automatic background sync and surface pending-expiration events before a connection stops updating.

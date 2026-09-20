@@ -3,8 +3,9 @@ import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PlaidConnectButton } from '../components/PlaidConnectButton';
+import { ManageConnectionModal } from '../components/ManageConnectionModal';
 import { ScreenHeader } from '../components/ScreenHeader';
-import { syncPlaidAccounts } from '../data/budgetRepository';
+import { disconnectPlaidItem, syncPlaidAccounts } from '../data/budgetRepository';
 import { colors, radius, shadow, spacing } from '../theme';
 import type { Account } from '../types';
 import { formatMoney } from '../utils/money';
@@ -17,6 +18,7 @@ type ConnectScreenProps = {
 
 export function ConnectScreen({ accounts, cloudMode, onAccountsChanged }: ConnectScreenProps) {
   const [syncing, setSyncing] = useState(false);
+  const [managedAccount, setManagedAccount] = useState<Account | null>(null);
   const sync = async () => {
     setSyncing(true);
     try {
@@ -27,6 +29,22 @@ export function ConnectScreen({ accounts, cloudMode, onAccountsChanged }: Connec
       Alert.alert('Could not sync accounts', caught instanceof Error ? caught.message : 'Please try again.');
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const disconnect = async (connectionId: string) => {
+    try {
+      const result = await disconnectPlaidItem(connectionId);
+      const disconnectedAccounts = result?.disconnectedAccounts ?? 0;
+      await onAccountsChanged();
+      setManagedAccount(null);
+      Alert.alert(
+        'Institution disconnected',
+        `${disconnectedAccounts} ${disconnectedAccounts === 1 ? 'account was' : 'accounts were'} disconnected. Imported history is still available.`,
+      );
+    } catch (caught) {
+      Alert.alert('Could not disconnect institution', caught instanceof Error ? caught.message : 'Please try again.');
+      throw caught;
     }
   };
 
@@ -57,7 +75,13 @@ export function ConnectScreen({ accounts, cloudMode, onAccountsChanged }: Connec
         ) : null}
         {accounts.map((account, index) => (
           <View key={account.id}>
-            <View style={styles.accountRow}>
+            <Pressable
+              accessibilityHint={account.connectionId ? 'Opens connection settings' : undefined}
+              accessibilityLabel={account.connectionId ? `Manage ${account.name}` : undefined}
+              disabled={!account.connectionId}
+              onPress={() => setManagedAccount(account)}
+              style={({ pressed }) => [styles.accountRow, pressed && styles.accountRowPressed]}
+            >
               <View style={styles.accountIcon}>
                 <MaterialCommunityIcons
                   color={colors.primary}
@@ -71,7 +95,8 @@ export function ConnectScreen({ accounts, cloudMode, onAccountsChanged }: Connec
                 <Text style={styles.syncMeta}>Updated {account.syncedAt}</Text>
               </View>
               <Text style={styles.accountBalance}>{formatMoney(account.balance, true)}</Text>
-            </View>
+              {account.connectionId ? <MaterialCommunityIcons color={colors.inkMuted} name="chevron-right" size={20} /> : null}
+            </Pressable>
             {index < accounts.length - 1 ? <View style={styles.divider} /> : null}
           </View>
         ))}
@@ -91,6 +116,19 @@ export function ConnectScreen({ accounts, cloudMode, onAccountsChanged }: Connec
           <Text style={styles.safetyText}>Your bank login is handled by Plaid. The app should store access tokens only on the server, never inside the phone app.</Text>
         </View>
       </View>
+
+      <ManageConnectionModal
+        account={managedAccount}
+        affectedAccountCount={managedAccount?.connectionId
+          ? accounts.filter((account) => account.connectionId === managedAccount.connectionId).length
+          : 0}
+        onClose={() => setManagedAccount(null)}
+        onDisconnect={disconnect}
+        onReconnected={async () => {
+          await onAccountsChanged();
+          setManagedAccount(null);
+        }}
+      />
     </ScrollView>
   );
 }
@@ -110,6 +148,7 @@ const styles = StyleSheet.create({
   emptyTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
   emptyText: { color: colors.inkMuted, fontSize: 12, lineHeight: 18, marginTop: spacing.xs, textAlign: 'center' },
   accountRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.lg },
+  accountRowPressed: { opacity: 0.65 },
   accountIcon: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.md, height: 46, justifyContent: 'center', width: 46 },
   accountCopy: { flex: 1, gap: 2 },
   accountName: { color: colors.ink, fontSize: 14, fontWeight: '800' },
