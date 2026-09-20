@@ -49,7 +49,8 @@ Plaid Link for web runs in supported iPhone browsers and is used by the installa
 - New Items register the hosted `plaid-webhook` endpoint, and existing Items are registered again during manual sync or connection repair.
 - The endpoint verifies Plaid's ES256 signature, five-minute freshness window, and exact raw-body SHA-256 before accepting an event.
 - Verified events are stored in a server-only receipt table. Transaction update events run incremental sync in a Supabase background task, while Item errors flag the connection for repair in the app.
+- Failed processing is retried every five minutes with exponential backoff. Queue claims use row locking to prevent duplicates, the scheduler credential is generated inside Supabase Vault, and repeated failures flag the affected connection and write an operational error log.
 
 ## Next hardening milestone
 
-Add a scheduled recovery worker for verified webhook events that remain failed after the background task limit, plus operational alerting for repeated failures.
+Add retention and cleanup policies for old processed webhook receipts, then add production monitoring before moving Plaid out of Sandbox.

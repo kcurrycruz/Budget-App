@@ -1,30 +1,19 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 
-import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.116.0';
 import { decodeProtectedHeader, importJWK, jwtVerify, type JWK } from 'jose';
 
 import { createAdminClient } from '../_shared/auth.ts';
 import { errorMessage, json } from '../_shared/http.ts';
-import { decryptAccessToken, PlaidApiError, plaidPost } from '../_shared/plaid.ts';
-import { syncPlaidItem, type PlaidItemRow } from '../_shared/sync.ts';
+import { PlaidApiError, plaidPost } from '../_shared/plaid.ts';
+import {
+  processClaimedPlaidWebhookEvent,
+  type PlaidWebhook,
+} from '../_shared/plaidWebhookEvents.ts';
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
-type PlaidWebhook = {
-  error?: { error_code?: unknown; error_message?: unknown } | null;
-  item_id?: unknown;
-  webhook_code?: unknown;
-  webhook_type?: unknown;
-};
-
 type VerificationKeyResponse = {
   key: JWK & { created_at?: number; expired_at?: number | null };
-};
-
-type WebhookEventRow = {
-  attempts: number;
-  id: string;
-  status: 'pending' | 'processing' | 'processed' | 'ignored' | 'failed';
 };
 
 const sha256Hex = async (value: string) => {
@@ -82,89 +71,27 @@ const verifyWebhook = async (request: Request, rawBody: string) => {
   return bodyHash;
 };
 
-const finishEvent = async (
-  admin: SupabaseClient,
-  eventId: string,
-  status: 'processed' | 'ignored' | 'failed',
-  lastError: string | null = null,
+const processEvent = async (
+  admin: ReturnType<typeof createAdminClient>,
+  event: { attempts: number; id: string },
+  webhook: PlaidWebhook,
 ) => {
-  const { error } = await admin.from('plaid_webhook_events').update({
-    status,
-    last_error: lastError,
-    processed_at: status === 'processed' || status === 'ignored' ? new Date().toISOString() : null,
-    updated_at: new Date().toISOString(),
-  }).eq('id', eventId);
-  if (error) console.error('Could not finish Plaid webhook event', eventId, error.message);
-};
-
-const markConnectionAttention = async (admin: SupabaseClient, item: { id: string }, message: string) => {
-  const now = new Date().toISOString();
-  const [itemResult, accountResult, stateResult] = await Promise.all([
-    admin.from('plaid_items').update({ status: 'login_required', updated_at: now }).eq('id', item.id),
-    admin.from('financial_accounts').update({ connection_status: 'attention', updated_at: now }).eq('plaid_item_id', item.id),
-    admin.from('plaid_sync_state').update({ last_error: message.slice(0, 500), updated_at: now }).eq('plaid_item_id', item.id),
-  ]);
-  if (itemResult.error) throw itemResult.error;
-  if (accountResult.error) throw accountResult.error;
-  if (stateResult.error) throw stateResult.error;
-};
-
-const processEvent = async (admin: SupabaseClient, event: WebhookEventRow, webhook: PlaidWebhook) => {
   if (event.attempts >= 20) return;
   const { data: claimed, error: claimError } = await admin.from('plaid_webhook_events').update({
     status: 'processing',
     attempts: event.attempts + 1,
+    claimed_at: new Date().toISOString(),
+    next_attempt_at: null,
     last_error: null,
     updated_at: new Date().toISOString(),
-  }).eq('id', event.id).in('status', ['pending', 'failed']).select('id').maybeSingle();
+  }).eq('id', event.id).in('status', ['pending', 'failed']).select('id, attempts').maybeSingle();
   if (claimError) throw claimError;
   if (!claimed) return;
-
-  try {
-    if (typeof webhook.item_id !== 'string') {
-      await finishEvent(admin, event.id, 'ignored');
-      return;
-    }
-    const { data: item, error } = await admin
-      .from('plaid_items')
-      .select('id, user_id, institution_name, access_token_ciphertext, status')
-      .eq('plaid_item_id', webhook.item_id)
-      .maybeSingle();
-    if (error) throw error;
-    if (!item || item.status === 'disconnected') {
-      await finishEvent(admin, event.id, 'ignored');
-      return;
-    }
-
-    if (webhook.webhook_type === 'TRANSACTIONS' && webhook.webhook_code === 'SYNC_UPDATES_AVAILABLE') {
-      await syncPlaidItem(admin, item as PlaidItemRow, await decryptAccessToken(item.access_token_ciphertext as string));
-      const { error: updateError } = await admin
-        .from('plaid_items')
-        .update({ status: 'active', updated_at: new Date().toISOString() })
-        .eq('id', item.id);
-      if (updateError) throw updateError;
-      await finishEvent(admin, event.id, 'processed');
-      return;
-    }
-
-    if (webhook.webhook_type === 'ITEM' && ['ERROR', 'PENDING_EXPIRATION', 'USER_PERMISSION_REVOKED'].includes(String(webhook.webhook_code))) {
-      const detail = typeof webhook.error?.error_message === 'string'
-        ? webhook.error.error_message
-        : `Plaid reported ${String(webhook.webhook_code).toLowerCase().replaceAll('_', ' ')}.`;
-      await markConnectionAttention(admin, item, detail);
-      await finishEvent(admin, event.id, 'processed');
-      return;
-    }
-
-    await finishEvent(admin, event.id, 'ignored');
-  } catch (caught) {
-    const message = errorMessage(caught);
-    if (caught instanceof PlaidApiError && caught.code === 'ITEM_LOGIN_REQUIRED' && typeof webhook.item_id === 'string') {
-      const { data: item } = await admin.from('plaid_items').select('id').eq('plaid_item_id', webhook.item_id).maybeSingle();
-      if (item) await markConnectionAttention(admin, item, message).catch(() => undefined);
-    }
-    await finishEvent(admin, event.id, 'failed', message.slice(0, 500));
-  }
+  await processClaimedPlaidWebhookEvent(admin, {
+    id: claimed.id as string,
+    attempts: Number(claimed.attempts),
+    payload: webhook,
+  });
 };
 
 Deno.serve(async (request) => {
@@ -205,7 +132,7 @@ Deno.serve(async (request) => {
       .single();
     if (eventError) throw eventError;
     if (event.status === 'pending' || event.status === 'failed') {
-      EdgeRuntime.waitUntil(processEvent(admin, event as WebhookEventRow, webhook).catch((caught) => {
+      EdgeRuntime.waitUntil(processEvent(admin, event, webhook).catch((caught) => {
         console.error('Plaid webhook background task failed', event.id, errorMessage(caught));
       }));
     }

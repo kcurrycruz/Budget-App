@@ -1,2 +1,5 @@
 [functions.plaid-webhook]
 verify_jwt = false
+
+[functions.plaid-webhook-retry]
+verify_jwt = false
