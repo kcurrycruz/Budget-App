@@ -6,6 +6,8 @@ A phone-first budget app that makes expense entry, monthly planning, and cash-fl
 
 The authenticated budget foundation is working with private Supabase-backed data, editable monthly plans, manual transactions, exports, and account controls. The same Expo client now exports as an installable mobile web app while Plaid Sandbox integration is prepared. Product decisions, architecture notes, and milestones belong in [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md).
 
+Live private beta: [kcurry-budget.expo.app](https://kcurry-budget.expo.app)
+
 ## Repository layout
 
 ```text
@@ -30,7 +32,7 @@ For the installable web version:
 
 1. Create a production bundle with `pnpm --dir apps/mobile build:web`.
 2. Preview it with `pnpm --dir apps/mobile preview:web`.
-3. Deploy `apps/mobile/dist` to an HTTPS static host.
+3. Deploy `apps/mobile/dist` to EAS Hosting with `eas deploy --prod`.
 
 See [`docs/WEB_APP.md`](docs/WEB_APP.md) for deployment requirements and iPhone installation steps.
 

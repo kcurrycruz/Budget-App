@@ -54,3 +54,4 @@ Record decisions here with the date, decision, and reason. Move longer technical
 - 2026-09-19: The first private beta will support multiple people with completely separate, private budgets. Shared household budgets are deferred until the personal workflow is proven.
 - 2026-09-19: Supabase Auth, Postgres, and Row Level Security will provide the first multi-user backend. Plaid credentials remain server-only.
 - 2026-09-19: The free private beta will ship as an installable HTTPS web app. Native iOS distribution can follow when an Apple Developer Program membership is justified.
+- 2026-09-19: EAS Hosting provides the beta's stable HTTPS production address at `https://kcurry-budget.expo.app`; Supabase Auth uses the same address as its default Site URL.

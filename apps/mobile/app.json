@@ -26,6 +26,12 @@
       "output": "single",
       "shortName": "Budget",
       "themeColor": "#176B45"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "54a82dc5-a860-4010-9feb-c4cd6399f2c7"
+      }
+    },
+    "owner": "kcurrycruz"
   }
 }
