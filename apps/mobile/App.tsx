@@ -57,6 +57,7 @@ type BudgetAppProps = { session: Session | null };
 
 function BudgetApp({ session }: BudgetAppProps) {
   const cloudMode = Boolean(session);
+  const forcePlanPreview = process.env.EXPO_PUBLIC_FORCE_PLAN_SETUP === 'true';
   const [activeTab, setActiveTab] = useState<AppTab>('home');
   const [transactions, setTransactions] = useState<Transaction[]>(cloudMode ? [] : initialTransactions);
   const [categories, setCategories] = useState(cloudMode ? [] : initialCategories);
@@ -67,7 +68,7 @@ function BudgetApp({ session }: BudgetAppProps) {
   const [dataError, setDataError] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [addSaving, setAddSaving] = useState(false);
-  const [planEditing, setPlanEditing] = useState(false);
+  const [planEditing, setPlanEditing] = useState(forcePlanPreview);
   const [accountOpen, setAccountOpen] = useState(false);
   const [reviewTransaction, setReviewTransaction] = useState<Transaction | null>(null);
   const [reviewSaving, setReviewSaving] = useState(false);
@@ -214,7 +215,7 @@ function BudgetApp({ session }: BudgetAppProps) {
   }
 
   const needsPlanSetup = session && (income === 0 || categories.every((category) => category.budget === 0));
-  if (session && (needsPlanSetup || planEditing)) {
+  if ((session && needsPlanSetup) || planEditing) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <PlanSetupScreen

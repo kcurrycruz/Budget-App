@@ -14,6 +14,7 @@ import {
 
 import { colors, radius, spacing } from '../theme';
 import type { Category } from '../types';
+import { formatMoneyInput, parseMoneyInput } from '../utils/money';
 
 type PlanSetupScreenProps = {
   categories: Category[];
@@ -30,19 +31,22 @@ export function PlanSetupScreen({
   onCancel,
   onSave,
 }: PlanSetupScreenProps) {
-  const [income, setIncome] = useState(initialIncome ? String(initialIncome) : '');
-  const [bills, setBills] = useState(initialBills ? String(initialBills) : '');
+  const [income, setIncome] = useState(initialIncome ? formatMoneyInput(String(initialIncome)) : '');
+  const [bills, setBills] = useState(initialBills ? formatMoneyInput(String(initialBills)) : '');
   const [categoryBudgets, setCategoryBudgets] = useState<Record<string, string>>(() => (
-    Object.fromEntries(categories.map((category) => [category.id, category.budget ? String(category.budget) : '']))
+    Object.fromEntries(categories.map((category) => [
+      category.id,
+      category.budget ? formatMoneyInput(String(category.budget)) : '',
+    ]))
   ));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const flexiblePlanned = useMemo(() => (
-    Object.values(categoryBudgets).reduce((sum, value) => sum + Number(value || 0), 0)
+    Object.values(categoryBudgets).reduce((sum, value) => sum + parseMoneyInput(value), 0)
   ), [categoryBudgets]);
-  const totalPlanned = Number(bills || 0) + flexiblePlanned;
-  const numericIncome = Number(income);
+  const totalPlanned = parseMoneyInput(bills) + flexiblePlanned;
+  const numericIncome = parseMoneyInput(income);
   const canSave = Number.isFinite(numericIncome) && numericIncome > 0 && flexiblePlanned > 0 && !busy;
 
   const save = async () => {
@@ -52,8 +56,8 @@ export function PlanSetupScreen({
     try {
       await onSave({
         income: numericIncome,
-        bills: Number(bills || 0),
-        categoryBudgets: Object.fromEntries(Object.entries(categoryBudgets).map(([id, value]) => [id, Number(value || 0)])),
+        bills: parseMoneyInput(bills),
+        categoryBudgets: Object.fromEntries(Object.entries(categoryBudgets).map(([id, value]) => [id, parseMoneyInput(value)])),
       });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'We could not save your plan. Please try again.');
@@ -81,12 +85,12 @@ export function PlanSetupScreen({
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Monthly take-home income</Text>
-          <MoneyInput onChangeText={setIncome} placeholder="7,000" value={income} />
+          <MoneyInput onChangeText={(value) => setIncome(formatMoneyInput(value))} placeholder="7,000" value={income} />
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Bills and fixed costs</Text>
-          <MoneyInput onChangeText={setBills} placeholder="2,800" value={bills} />
+          <MoneyInput onChangeText={(value) => setBills(formatMoneyInput(value))} placeholder="2,800" value={bills} />
           <Text style={styles.hint}>Rent, utilities, debt payments, subscriptions, and other commitments.</Text>
         </View>
 
@@ -108,7 +112,10 @@ export function PlanSetupScreen({
                     <Text style={styles.currency}>$</Text>
                     <TextInput
                       keyboardType="decimal-pad"
-                      onChangeText={(value) => setCategoryBudgets((current) => ({ ...current, [category.id]: value }))}
+                      onChangeText={(value) => setCategoryBudgets((current) => ({
+                        ...current,
+                        [category.id]: formatMoneyInput(value),
+                      }))}
                       placeholder="0"
                       placeholderTextColor={colors.inkMuted}
                       style={styles.compactTextInput}
@@ -172,15 +179,15 @@ const styles = StyleSheet.create({
   hint: { color: colors.inkMuted, fontSize: 11, lineHeight: 16 },
   moneyInput: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, flexDirection: 'row', paddingHorizontal: spacing.lg },
   moneyCurrency: { color: colors.ink, fontSize: 22, fontWeight: '800' },
-  moneyTextInput: { color: colors.ink, flex: 1, fontSize: 24, fontWeight: '800', height: 58, paddingHorizontal: spacing.sm },
+  moneyTextInput: { color: colors.ink, flex: 1, fontSize: 24, fontWeight: '800', height: 58, minWidth: 0, paddingHorizontal: spacing.sm, textAlign: 'left' },
   perMonth: { color: colors.inkMuted, fontSize: 12, fontWeight: '700' },
   categoryList: { backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.lg },
   categoryRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.md },
   categoryIcon: { alignItems: 'center', borderRadius: radius.sm, height: 38, justifyContent: 'center', width: 38 },
   categoryName: { color: colors.ink, flex: 1, fontSize: 14, fontWeight: '800' },
-  compactInput: { alignItems: 'center', backgroundColor: colors.background, borderRadius: radius.sm, flexDirection: 'row', paddingHorizontal: spacing.sm, width: 94 },
+  compactInput: { alignItems: 'center', backgroundColor: colors.background, borderRadius: radius.sm, flexDirection: 'row', paddingHorizontal: spacing.sm, width: 108 },
   currency: { color: colors.inkMuted, fontSize: 13, fontWeight: '800' },
-  compactTextInput: { color: colors.ink, flex: 1, fontSize: 15, fontWeight: '800', height: 42, paddingHorizontal: 4, textAlign: 'right' },
+  compactTextInput: { color: colors.ink, flex: 1, fontSize: 15, fontWeight: '800', height: 42, minWidth: 0, paddingHorizontal: 4, textAlign: 'left' },
   divider: { backgroundColor: colors.border, height: StyleSheet.hairlineWidth, marginLeft: 50 },
   summary: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.md, flexDirection: 'row', justifyContent: 'space-between', padding: spacing.lg },
   summaryLabel: { color: colors.primaryDark, fontSize: 13, fontWeight: '800' },

@@ -15,6 +15,7 @@ import {
 import { colors, radius, spacing } from '../theme';
 import type { Category, ManualTransactionDraft } from '../types';
 import { toDateOnly } from '../utils/date';
+import { formatMoneyInput, parseMoneyInput } from '../utils/money';
 
 type AddTransactionModalProps = {
   categories: Category[];
@@ -43,7 +44,7 @@ export function AddTransactionModal({ categories, visible, saving, onClose, onSa
     }
   }, [categories, visible]);
 
-  const numericAmount = Number.parseFloat(amount);
+  const numericAmount = parseMoneyInput(amount);
   const canSave = !saving && merchant.trim().length > 0 && Number.isFinite(numericAmount) && numericAmount > 0;
 
   const save = () => {
@@ -100,7 +101,7 @@ export function AddTransactionModal({ categories, visible, saving, onClose, onSa
               <TextInput
                 autoFocus
                 keyboardType="decimal-pad"
-                onChangeText={setAmount}
+                onChangeText={(value) => setAmount(formatMoneyInput(value))}
                 placeholder="0.00"
                 placeholderTextColor="#A7B0AA"
                 style={styles.amountInput}
@@ -212,7 +213,7 @@ const styles = StyleSheet.create({
   amountLabel: { color: colors.inkMuted, fontSize: 12, fontWeight: '700' },
   amountLine: { alignItems: 'center', flexDirection: 'row', justifyContent: 'center', marginTop: spacing.sm },
   currency: { color: colors.ink, fontSize: 34, fontWeight: '700', marginRight: spacing.xs },
-  amountInput: { color: colors.ink, fontSize: 48, fontWeight: '800', minWidth: 150, padding: 0 },
+  amountInput: { color: colors.ink, fontSize: 48, fontWeight: '800', minWidth: 150, padding: 0, textAlign: 'left' },
   fieldGroup: { gap: spacing.sm },
   fieldLabel: { color: colors.ink, fontSize: 13, fontWeight: '800' },
   textInput: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, color: colors.ink, fontSize: 16, height: 54, paddingHorizontal: spacing.lg },
