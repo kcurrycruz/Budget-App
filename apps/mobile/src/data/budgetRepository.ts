@@ -190,3 +190,26 @@ export async function saveMonthlyPlan(input: {
   const categoryError = categoryResults.find((result) => result.error)?.error;
   if (categoryError) throw categoryError;
 }
+
+export async function exportCloudBudget() {
+  const client = requireClient();
+  const [profileResult, monthsResult, categoriesResult, accountsResult, transactionsResult] = await Promise.all([
+    client.from('profiles').select('full_name, created_at, updated_at').single(),
+    client.from('budget_months').select('month, expected_income, fixed_costs, created_at, updated_at').order('month'),
+    client.from('categories').select('name, color, icon, monthly_limit, sort_order, archived_at, created_at, updated_at').order('sort_order'),
+    client.from('financial_accounts').select('display_name, institution_name, mask, account_type, current_balance, currency_code, last_synced_at, disconnected_at, created_at, updated_at').order('created_at'),
+    client.from('transactions').select('merchant_name, amount, transaction_date, pending, source, note, category_id, financial_account_id, created_at, updated_at').order('transaction_date', { ascending: false }),
+  ]);
+
+  const error = profileResult.error ?? monthsResult.error ?? categoriesResult.error ?? accountsResult.error ?? transactionsResult.error;
+  if (error) throw error;
+
+  return JSON.stringify({
+    exported_at: new Date().toISOString(),
+    profile: profileResult.data,
+    monthly_plans: monthsResult.data,
+    categories: categoriesResult.data,
+    financial_accounts: accountsResult.data,
+    transactions: transactionsResult.data,
+  }, null, 2);
+}

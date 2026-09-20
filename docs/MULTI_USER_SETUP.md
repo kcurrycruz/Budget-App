@@ -21,8 +21,9 @@ Only the URL and publishable client key belong in the Expo environment file. Nev
 
 ## Next implementation slice
 
-1. Add account deletion and data export before inviting beta testers.
-2. Add Plaid sandbox functions only after the server boundary is deployed.
-3. Add automatic category suggestions and a review queue for imported transactions.
+1. Add Plaid sandbox functions now that the server boundary is deployed.
+2. Add automatic category suggestions and a review queue for imported transactions.
 
 The app already reads each signed-in user's monthly plan, categories, accounts, and transactions from Supabase. Manual expenses are saved to the database, and a new user receives a first-time monthly-plan setup screen.
+
+Account settings include a Row Level Security-scoped data export and an authenticated `delete-account` Edge Function. The function determines the target user from the caller's verified access token; the mobile app never receives a service-role key.

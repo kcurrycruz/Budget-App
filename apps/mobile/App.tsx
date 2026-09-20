@@ -5,9 +5,10 @@ import { Alert, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-na
 
 import { AddTransactionModal } from './src/components/AddTransactionModal';
 import { BottomNav } from './src/components/BottomNav';
-import { createManualTransaction, loadCloudBudget, saveMonthlyPlan } from './src/data/budgetRepository';
+import { createManualTransaction, exportCloudBudget, loadCloudBudget, saveMonthlyPlan } from './src/data/budgetRepository';
 import { accounts, initialCategories, initialTransactions, monthlyBills, monthlyIncome } from './src/data/demo';
 import { isCloudConfigured, supabase } from './src/lib/supabase';
+import { AccountScreen } from './src/screens/AccountScreen';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { ConnectScreen } from './src/screens/ConnectScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
@@ -58,6 +59,7 @@ function BudgetApp({ session }: BudgetAppProps) {
   const [dataError, setDataError] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [planEditing, setPlanEditing] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
 
   const refreshCloudData = useCallback(async () => {
     if (!session) return;
@@ -125,16 +127,24 @@ function BudgetApp({ session }: BudgetAppProps) {
   const email = session?.user.email ?? '';
   const userInitials = email ? email.slice(0, 2).toUpperCase() : 'KC';
   const openProfile = () => {
-    const client = supabase;
-    if (!session || !client) {
+    if (!session || !supabase) {
       Alert.alert('Preview mode', 'Cloud accounts will appear here after Supabase is connected.');
       return;
     }
+    setAccountOpen(true);
+  };
 
-    Alert.alert('Your account', email, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: () => { void client.auth.signOut(); } },
-    ]);
+  const signOut = async () => {
+    if (!supabase) return;
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+  };
+
+  const deleteAccount = async () => {
+    if (!supabase) return;
+    const { error } = await supabase.functions.invoke('delete-account');
+    if (error) throw error;
+    await supabase.auth.signOut({ scope: 'local' });
   };
 
   if (dataLoading) return <LoadingScreen />;
@@ -157,13 +167,32 @@ function BudgetApp({ session }: BudgetAppProps) {
   const needsPlanSetup = session && (income === 0 || categories.every((category) => category.budget === 0));
   if (session && (needsPlanSetup || planEditing)) {
     return (
-      <PlanSetupScreen
-        categories={categories}
-        initialBills={bills}
-        initialIncome={income}
-        onCancel={needsPlanSetup ? undefined : () => setPlanEditing(false)}
-        onSave={savePlan}
-      />
+      <SafeAreaView style={styles.safeArea}>
+        <PlanSetupScreen
+          categories={categories}
+          initialBills={bills}
+          initialIncome={income}
+          onCancel={needsPlanSetup ? undefined : () => setPlanEditing(false)}
+          onSave={savePlan}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  if (session && accountOpen) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <AccountScreen
+          accountCount={connectedAccounts.length}
+          email={email}
+          fullName={String(session.user.user_metadata.full_name ?? '')}
+          onBack={() => setAccountOpen(false)}
+          onDelete={deleteAccount}
+          onExport={exportCloudBudget}
+          onSignOut={signOut}
+          transactionCount={transactions.length}
+        />
+      </SafeAreaView>
     );
   }
 
