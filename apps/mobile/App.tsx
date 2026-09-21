@@ -5,17 +5,22 @@ import { Alert, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-na
 
 import { AddTransactionModal } from './src/components/AddTransactionModal';
 import { BottomNav } from './src/components/BottomNav';
+import { RecurringBillModal } from './src/components/RecurringBillModal';
 import { ReviewTransactionModal } from './src/components/ReviewTransactionModal';
 import {
   categorizeTransaction,
   createManualTransaction,
+  createRecurringBill,
   deleteManualTransaction,
+  deleteRecurringBill,
   exportCloudBudget,
   loadCloudBudget,
   saveMonthlyPlan,
+  setRecurringBillPaid,
   updateManualTransaction,
+  updateRecurringBill,
 } from './src/data/budgetRepository';
-import { accounts, initialCategories, initialTransactions, monthlyBills, monthlyIncome } from './src/data/demo';
+import { accounts, initialCategories, initialRecurringBills, initialTransactions, monthlyBills, monthlyIncome } from './src/data/demo';
 import { isCloudConfigured, supabase } from './src/lib/supabase';
 import { AccountScreen } from './src/screens/AccountScreen';
 import { AuthScreen } from './src/screens/AuthScreen';
@@ -27,7 +32,7 @@ import { PlanSetupScreen } from './src/screens/PlanSetupScreen';
 import { TransactionsScreen } from './src/screens/TransactionsScreen';
 import { UpdatePasswordScreen } from './src/screens/UpdatePasswordScreen';
 import { colors } from './src/theme';
-import type { AppTab, ManualTransactionDraft, Transaction } from './src/types';
+import type { AppTab, ManualTransactionDraft, RecurringBill, RecurringBillDraft, Transaction } from './src/types';
 import { formatActivityDate } from './src/utils/date';
 
 export default function App() {
@@ -72,12 +77,16 @@ function BudgetApp({ session }: BudgetAppProps) {
   const [connectedAccounts, setConnectedAccounts] = useState(cloudMode ? [] : accounts);
   const [income, setIncome] = useState(cloudMode ? 0 : monthlyIncome);
   const [bills, setBills] = useState(cloudMode ? 0 : monthlyBills);
+  const [recurringBills, setRecurringBills] = useState<RecurringBill[]>(cloudMode ? [] : initialRecurringBills);
   const [dataLoading, setDataLoading] = useState(cloudMode);
   const [dataError, setDataError] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [addSaving, setAddSaving] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [planEditing, setPlanEditing] = useState(forcePlanPreview);
+  const [billOpen, setBillOpen] = useState(false);
+  const [billSaving, setBillSaving] = useState(false);
+  const [editingBill, setEditingBill] = useState<RecurringBill | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [reviewTransaction, setReviewTransaction] = useState<Transaction | null>(null);
   const [reviewSaving, setReviewSaving] = useState(false);
@@ -94,6 +103,7 @@ function BudgetApp({ session }: BudgetAppProps) {
       setConnectedAccounts(data.accounts);
       setIncome(data.income);
       setBills(data.bills);
+      setRecurringBills(data.recurringBills);
     } catch (caught) {
       setDataError(caught instanceof Error ? caught.message : 'Your cloud budget could not be loaded.');
     } finally {
@@ -232,6 +242,76 @@ function BudgetApp({ session }: BudgetAppProps) {
     setPlanEditing(false);
   };
 
+  const openRecurringBill = (bill?: RecurringBill) => {
+    setEditingBill(bill ?? null);
+    setBillOpen(true);
+  };
+
+  const saveRecurringBill = async (draft: RecurringBillDraft) => {
+    setBillSaving(true);
+    try {
+      if (editingBill) {
+        const saved = session
+          ? await updateRecurringBill(editingBill.id, draft)
+          : { id: editingBill.id, ...draft };
+        setRecurringBills((current) => current
+          .map((bill) => (bill.id === editingBill.id ? { ...bill, ...saved } : bill))
+          .sort((left, right) => left.dueDay - right.dueDay || left.name.localeCompare(right.name)));
+      } else {
+        const saved = session
+          ? await createRecurringBill(draft)
+          : { id: `bill-${Date.now()}`, ...draft, paid: false } satisfies RecurringBill;
+        setRecurringBills((current) => [...current, saved]
+          .sort((left, right) => left.dueDay - right.dueDay || left.name.localeCompare(right.name)));
+      }
+      setBillOpen(false);
+      setEditingBill(null);
+    } catch (caught) {
+      Alert.alert('Could not save recurring bill', caught instanceof Error ? caught.message : 'Please try again.');
+    } finally {
+      setBillSaving(false);
+    }
+  };
+
+  const toggleRecurringBillPaid = async (bill: RecurringBill) => {
+    const nextPaid = !bill.paid;
+    try {
+      const paidAt = session ? await setRecurringBillPaid(bill.id, nextPaid) : nextPaid ? new Date().toISOString() : undefined;
+      setRecurringBills((current) => current.map((item) => (
+        item.id === bill.id ? { ...item, paid: nextPaid, paidAt } : item
+      )));
+    } catch (caught) {
+      Alert.alert('Could not update bill', caught instanceof Error ? caught.message : 'Please try again.');
+    }
+  };
+
+  const performDeleteRecurringBill = async (bill: RecurringBill) => {
+    setBillSaving(true);
+    try {
+      if (session) await deleteRecurringBill(bill.id);
+      setRecurringBills((current) => current.filter((item) => item.id !== bill.id));
+      setBillOpen(false);
+      setEditingBill(null);
+    } catch (caught) {
+      Alert.alert('Could not delete recurring bill', caught instanceof Error ? caught.message : 'Please try again.');
+    } finally {
+      setBillSaving(false);
+    }
+  };
+
+  const confirmDeleteRecurringBill = () => {
+    const bill = editingBill;
+    if (!bill) return;
+    Alert.alert(
+      'Delete this recurring bill?',
+      `${bill.name} and its payment history will be permanently removed.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => { void performDeleteRecurringBill(bill); } },
+      ],
+    );
+  };
+
   const saveTransactionCategory = async (categoryId: string) => {
     if (!reviewTransaction) return;
     setReviewSaving(true);
@@ -348,7 +428,18 @@ function BudgetApp({ session }: BudgetAppProps) {
           />
         );
       case 'plan':
-        return <PlanScreen bills={bills} categories={categories} income={income} onEdit={() => setPlanEditing(true)} />;
+        return (
+          <PlanScreen
+            bills={bills}
+            categories={categories}
+            income={income}
+            onAddBill={() => openRecurringBill()}
+            onEdit={() => setPlanEditing(true)}
+            onEditBill={openRecurringBill}
+            onToggleBillPaid={(bill) => { void toggleRecurringBillPaid(bill); }}
+            recurringBills={recurringBills}
+          />
+        );
       case 'connect':
         return <ConnectScreen accounts={connectedAccounts} cloudMode={cloudMode} onAccountsChanged={refreshCloudData} />;
       default:
@@ -359,9 +450,12 @@ function BudgetApp({ session }: BudgetAppProps) {
             onAdd={openTransactionEntry}
             onConnect={() => setActiveTab('connect')}
             onOpenProfile={openProfile}
+            onToggleBillPaid={(bill) => { void toggleRecurringBillPaid(bill); }}
+            onViewPlan={() => setActiveTab('plan')}
             onViewTransactions={() => setActiveTab('transactions')}
             previewMode={!isCloudConfigured}
             transactions={transactions}
+            recurringBills={recurringBills}
             userInitials={userInitials}
           />
         );
@@ -383,6 +477,18 @@ function BudgetApp({ session }: BudgetAppProps) {
         onSave={saveTransaction}
         saving={addSaving}
         visible={addOpen}
+      />
+      <RecurringBillModal
+        categories={categories}
+        initialBill={editingBill}
+        onClose={() => {
+          setBillOpen(false);
+          setEditingBill(null);
+        }}
+        onDelete={editingBill ? confirmDeleteRecurringBill : undefined}
+        onSave={(draft) => { void saveRecurringBill(draft); }}
+        saving={billSaving}
+        visible={billOpen}
       />
       <ReviewTransactionModal
         categories={categories}

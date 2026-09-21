@@ -2,6 +2,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -84,11 +85,15 @@ export function AuthScreen() {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View style={styles.brandMark}>
-          <MaterialCommunityIcons color={colors.white} name="wallet-bifold-outline" size={30} />
+        <View style={styles.brandRow}>
+          <Image accessibilityLabel="Zenify logo" source={require('../../assets/zenify-logo.jpg')} style={styles.brandMark} />
+          <View>
+            <Text style={styles.brandName}>Zenify</Text>
+            <Text style={styles.brandLine}>Your finances, unified.</Text>
+          </View>
         </View>
         <View style={styles.intro}>
-          <Text style={styles.eyebrow}>YOUR MONEY, MADE CLEAR</Text>
+          <Text style={styles.eyebrow}>ONE CLEAR FINANCIAL VIEW</Text>
           <Text style={styles.title}>
             {isReset ? 'Reset your password' : isSignUp ? 'Create your private budget' : 'Welcome back'}
           </Text>
@@ -203,7 +208,10 @@ export function AuthScreen() {
 const styles = StyleSheet.create({
   safeArea: { backgroundColor: colors.background, flex: 1 },
   content: { flexGrow: 1, justifyContent: 'center', padding: spacing.xl, paddingVertical: spacing.xxl, gap: spacing.xl },
-  brandMark: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: colors.primary, borderRadius: radius.md, height: 56, justifyContent: 'center', width: 56 },
+  brandRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.md },
+  brandMark: { borderRadius: radius.md, height: 56, width: 56 },
+  brandName: { color: colors.ink, fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
+  brandLine: { color: colors.inkMuted, fontSize: 12, marginTop: 2 },
   intro: { gap: spacing.sm },
   eyebrow: { color: colors.primary, fontSize: 12, fontWeight: '800', letterSpacing: 0.8 },
   title: { color: colors.ink, fontSize: 34, fontWeight: '800', letterSpacing: -1 },

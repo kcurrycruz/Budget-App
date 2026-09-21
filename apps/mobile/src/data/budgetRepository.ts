@@ -1,7 +1,7 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
 
 import { supabase } from '../lib/supabase';
-import type { Account, Category, ManualTransactionDraft, Transaction } from '../types';
+import type { Account, Category, ManualTransactionDraft, RecurringBill, RecurringBillDraft, Transaction } from '../types';
 import { formatActivityDate, toDateOnly } from '../utils/date';
 
 export type CloudBudgetData = {
@@ -9,6 +9,7 @@ export type CloudBudgetData = {
   bills: number;
   categories: Category[];
   income: number;
+  recurringBills: RecurringBill[];
   transactions: Transaction[];
 };
 
@@ -46,6 +47,19 @@ type TransactionRow = {
   note: string | null;
 };
 
+type RecurringBillRow = {
+  id: string;
+  name: string;
+  amount: number | string;
+  due_day: number;
+  category_id: string | null;
+};
+
+type RecurringBillPaymentRow = {
+  recurring_bill_id: string;
+  paid_at: string;
+};
+
 const getMonthBounds = () => {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -79,19 +93,25 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
   const client = requireClient();
   const { start, end } = getMonthBounds();
 
-  const [monthResult, categoriesResult, accountsResult, transactionsResult] = await Promise.all([
+  const [monthResult, categoriesResult, accountsResult, transactionsResult, billsResult, billPaymentsResult] = await Promise.all([
     client.from('budget_months').select('expected_income, fixed_costs').eq('month', start).maybeSingle(),
     client.from('categories').select('id, name, color, icon, monthly_limit').is('archived_at', null).order('sort_order'),
     client.from('financial_accounts').select('id, display_name, institution_name, mask, account_type, current_balance, connection_status, plaid_item_id, last_synced_at').is('disconnected_at', null).order('created_at'),
     client.from('transactions').select('id, merchant_name, category_id, financial_account_id, amount, direction, needs_review, transaction_date, pending, source, note').gte('transaction_date', start).lt('transaction_date', end).order('transaction_date', { ascending: false }).order('created_at', { ascending: false }),
+    client.from('recurring_bills').select('id, name, amount, due_day, category_id').eq('active', true).order('due_day').order('name'),
+    client.from('recurring_bill_payments').select('recurring_bill_id, paid_at').eq('month', start),
   ]);
 
-  const error = monthResult.error ?? categoriesResult.error ?? accountsResult.error ?? transactionsResult.error;
+  const error = monthResult.error ?? categoriesResult.error ?? accountsResult.error ?? transactionsResult.error
+    ?? billsResult.error ?? billPaymentsResult.error;
   if (error) throw error;
 
   const categoryRows = (categoriesResult.data ?? []) as CategoryRow[];
   const accountRows = (accountsResult.data ?? []) as AccountRow[];
   const transactionRows = (transactionsResult.data ?? []) as TransactionRow[];
+  const recurringBillRows = (billsResult.data ?? []) as RecurringBillRow[];
+  const paymentRows = (billPaymentsResult.data ?? []) as RecurringBillPaymentRow[];
+  const billPayments = new Map(paymentRows.map((payment) => [payment.recurring_bill_id, payment.paid_at]));
   const accountNames = new Map(accountRows.map((account) => [account.id, account.display_name]));
   const spending = new Map<string, number>();
 
@@ -138,13 +158,103 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
     transactionDate: transaction.transaction_date,
   }));
 
+  const recurringBills: RecurringBill[] = recurringBillRows.map((bill) => ({
+    id: bill.id,
+    name: bill.name,
+    amount: Number(bill.amount),
+    dueDay: bill.due_day,
+    categoryId: bill.category_id ?? undefined,
+    paid: billPayments.has(bill.id),
+    paidAt: billPayments.get(bill.id),
+  }));
+
   return {
     accounts,
     bills: Number(monthResult.data?.fixed_costs ?? 0),
     categories,
     income: Number(monthResult.data?.expected_income ?? 0),
+    recurringBills,
     transactions,
   };
+}
+
+export async function createRecurringBill(draft: RecurringBillDraft) {
+  const client = requireClient();
+  const { data, error } = await client
+    .from('recurring_bills')
+    .insert({
+      name: draft.name,
+      amount: draft.amount,
+      due_day: draft.dueDay,
+      category_id: draft.categoryId || null,
+    })
+    .select('id, name, amount, due_day, category_id')
+    .single();
+
+  if (error) throw error;
+  return {
+    id: data.id,
+    name: data.name,
+    amount: Number(data.amount),
+    dueDay: data.due_day,
+    categoryId: data.category_id ?? undefined,
+    paid: false,
+  } satisfies RecurringBill;
+}
+
+export async function updateRecurringBill(billId: string, draft: RecurringBillDraft) {
+  const client = requireClient();
+  const { data, error } = await client
+    .from('recurring_bills')
+    .update({
+      name: draft.name,
+      amount: draft.amount,
+      due_day: draft.dueDay,
+      category_id: draft.categoryId || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', billId)
+    .select('id, name, amount, due_day, category_id')
+    .single();
+
+  if (error) throw error;
+  return {
+    id: data.id,
+    name: data.name,
+    amount: Number(data.amount),
+    dueDay: data.due_day,
+    categoryId: data.category_id ?? undefined,
+  };
+}
+
+export async function deleteRecurringBill(billId: string) {
+  const client = requireClient();
+  const { data, error } = await client.from('recurring_bills').delete().eq('id', billId).select('id').single();
+  if (error) throw error;
+  if (!data?.id) throw new Error('The recurring bill could not be deleted.');
+}
+
+export async function setRecurringBillPaid(billId: string, paid: boolean) {
+  const client = requireClient();
+  const { start } = getMonthBounds();
+
+  if (!paid) {
+    const { error } = await client
+      .from('recurring_bill_payments')
+      .delete()
+      .eq('recurring_bill_id', billId)
+      .eq('month', start);
+    if (error) throw error;
+    return undefined;
+  }
+
+  const { data, error } = await client
+    .from('recurring_bill_payments')
+    .insert({ recurring_bill_id: billId, month: start })
+    .select('paid_at')
+    .single();
+  if (error) throw error;
+  return data.paid_at;
 }
 
 export async function createManualTransaction(draft: ManualTransactionDraft) {
@@ -277,15 +387,18 @@ export async function saveMonthlyPlan(input: {
 
 export async function exportCloudBudget() {
   const client = requireClient();
-  const [profileResult, monthsResult, categoriesResult, accountsResult, transactionsResult] = await Promise.all([
+  const [profileResult, monthsResult, categoriesResult, accountsResult, transactionsResult, recurringBillsResult, recurringBillPaymentsResult] = await Promise.all([
     client.from('profiles').select('full_name, created_at, updated_at').single(),
     client.from('budget_months').select('month, expected_income, fixed_costs, created_at, updated_at').order('month'),
     client.from('categories').select('name, color, icon, monthly_limit, sort_order, archived_at, created_at, updated_at').order('sort_order'),
     client.from('financial_accounts').select('display_name, institution_name, mask, account_type, current_balance, currency_code, last_synced_at, disconnected_at, created_at, updated_at').order('created_at'),
     client.from('transactions').select('merchant_name, amount, direction, needs_review, plaid_category_primary, plaid_category_detailed, transaction_date, pending, source, note, category_id, financial_account_id, created_at, updated_at').order('transaction_date', { ascending: false }),
+    client.from('recurring_bills').select('name, amount, due_day, category_id, active, created_at, updated_at').order('due_day'),
+    client.from('recurring_bill_payments').select('recurring_bill_id, month, paid_at, created_at').order('month', { ascending: false }),
   ]);
 
-  const error = profileResult.error ?? monthsResult.error ?? categoriesResult.error ?? accountsResult.error ?? transactionsResult.error;
+  const error = profileResult.error ?? monthsResult.error ?? categoriesResult.error ?? accountsResult.error
+    ?? transactionsResult.error ?? recurringBillsResult.error ?? recurringBillPaymentsResult.error;
   if (error) throw error;
 
   return JSON.stringify({
@@ -295,6 +408,8 @@ export async function exportCloudBudget() {
     categories: categoriesResult.data,
     financial_accounts: accountsResult.data,
     transactions: transactionsResult.data,
+    recurring_bills: recurringBillsResult.data,
+    recurring_bill_payments: recurringBillPaymentsResult.data,
   }, null, 2);
 }
 

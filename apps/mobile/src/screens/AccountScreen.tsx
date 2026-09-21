@@ -49,7 +49,7 @@ export function AccountScreen({
     setExporting(true);
     try {
       const payload = await onExport();
-      await Share.share({ message: payload, title: 'My Budget App data' });
+      await Share.share({ message: payload, title: 'My Zenify data' });
     } catch (caught) {
       Alert.alert('Export failed', caught instanceof Error ? caught.message : 'Please try again.');
     } finally {

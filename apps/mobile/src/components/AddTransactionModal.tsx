@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
   amountLabel: { color: colors.inkMuted, fontSize: 12, fontWeight: '700' },
   amountLine: { alignItems: 'center', flexDirection: 'row', justifyContent: 'center', marginTop: spacing.sm },
   currency: { color: colors.ink, fontSize: 34, fontWeight: '700', marginRight: spacing.xs },
-  amountInput: { color: colors.ink, fontSize: 48, fontWeight: '800', minWidth: 150, padding: 0, textAlign: 'left' },
+  amountInput: { color: colors.ink, fontSize: 48, fontWeight: '800', padding: 0, textAlign: 'left', width: 230 },
   fieldGroup: { gap: spacing.sm },
   fieldLabel: { color: colors.ink, fontSize: 13, fontWeight: '800' },
   textInput: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, color: colors.ink, fontSize: 16, height: 54, paddingHorizontal: spacing.lg },

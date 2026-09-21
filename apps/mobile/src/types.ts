@@ -31,6 +31,23 @@ export type ManualTransactionDraft = {
   transactionDate: string;
 };
 
+export type RecurringBill = {
+  id: string;
+  name: string;
+  amount: number;
+  dueDay: number;
+  categoryId?: string;
+  paid: boolean;
+  paidAt?: string;
+};
+
+export type RecurringBillDraft = {
+  name: string;
+  amount: number;
+  dueDay: number;
+  categoryId?: string;
+};
+
 export type Account = {
   id: string;
   name: string;

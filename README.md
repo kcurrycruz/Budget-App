@@ -1,6 +1,6 @@
-# Budget App 2
+# Zenify
 
-A phone-first budget app that makes expense entry, monthly planning, and cash-flow visibility feel simpler than a spreadsheet.
+A phone-first finance app that unifies spending, budgeting, bills, and cash-flow visibility while staying simpler than a spreadsheet.
 
 ## Project status
 

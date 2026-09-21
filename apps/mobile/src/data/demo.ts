@@ -1,7 +1,14 @@
-import type { Account, Category, Transaction } from '../types';
+import type { Account, Category, RecurringBill, Transaction } from '../types';
 
 export const monthlyIncome = 7000;
 export const monthlyBills = 2780;
+
+export const initialRecurringBills: RecurringBill[] = [
+  { id: 'b1', name: 'Rent', amount: 1850, dueDay: 1, categoryId: 'home', paid: true, paidAt: '2026-09-01T12:00:00Z' },
+  { id: 'b2', name: 'City Electric', amount: 118.44, dueDay: 24, categoryId: 'home', paid: false },
+  { id: 'b3', name: 'Internet', amount: 79.99, dueDay: 27, categoryId: 'home', paid: false },
+  { id: 'b4', name: 'Streaming bundle', amount: 24.99, dueDay: 29, categoryId: 'fun', paid: false },
+];
 
 export const initialCategories: Category[] = [
   { id: 'home', name: 'Home', color: '#5C7CFA', icon: 'home-variant-outline', spent: 1820, budget: 2100 },

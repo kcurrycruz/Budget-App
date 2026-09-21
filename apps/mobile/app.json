@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Budget App",
+    "name": "Zenify",
     "slug": "budget-app-mobile",
     "version": "0.1.0",
     "icon": "./public/icon-1024.png",
@@ -19,13 +19,13 @@
     },
     "web": {
       "bundler": "metro",
-      "description": "A clear, private budget for tracking spending, planning each month, and connecting financial accounts.",
+      "description": "Unify your finances in one simple place and make progress toward your goals.",
       "favicon": "./public/icon-192.png",
       "lang": "en",
-      "name": "Budget App",
+      "name": "Zenify",
       "output": "single",
-      "shortName": "Budget",
-      "themeColor": "#176B45"
+      "shortName": "Zenify",
+      "themeColor": "#172338"
     },
     "extra": {
       "eas": {

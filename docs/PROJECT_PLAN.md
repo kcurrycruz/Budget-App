@@ -4,6 +4,8 @@
 
 Build a phone-first budget app that makes entering financial information and understanding monthly cash flow easier than maintaining a spreadsheet.
 
+Product name: **Zenify**. Brand promise: **Unifying all finances in one place to reach your financial goals.**
+
 ## Product principles
 
 - Make the next useful action obvious.
@@ -39,6 +41,48 @@ The current private beta is a foundation, not a locked final design. Continue ad
 - Continued navigation, typography, spacing, accessibility, and visual-polish iterations.
 - Native iPhone-specific improvements after the custom development build is introduced.
 
+## User-research roadmap
+
+The [Budget App Suggestions discussion](https://www.reddit.com/r/budget/comments/1grz201/budget_app_suggestions/) reinforces one core product opportunity: people want connected transaction tracking and capable budgeting in one place, but they do not want a steep learning curve or an interface that constantly rearranges itself.
+
+The app will cover the thread's requests through progressive disclosure: the default experience stays focused on **This month**, while deeper controls live behind the relevant category, transaction, bill, account, or report.
+
+### Now — make the monthly routine complete
+
+- Track recurring bills and subscriptions, their due days, and whether each is paid this month.
+- Show upcoming bills on Home without double-counting the fixed-cost plan.
+- Keep both Plaid-connected and fast manual transactions.
+- Keep category limits visible and clearly flag overspending.
+
+### Next — customization without clutter
+
+- Let users create, rename, reorder, archive, and choose colors/icons for categories.
+- Add optional subcategories for people who want granularity; broad categories remain the default.
+- Add reusable merchant rules so corrected transactions stay categorized the user's way.
+- Support planned one-time expenses alongside recurring bills.
+- Add optional Needs, Wants, Giving, Saving/Investing, and Personal tags across any category.
+
+### Then — one useful financial picture
+
+- Add a cash-flow report that combines income, fixed costs, planned spending, and actual transactions.
+- Add monthly comparisons and simple percentage views for Needs, Wants, and Savings.
+- Add savings goals, sinking funds, and net-worth tracking without putting them on the primary Home screen.
+- Add spreadsheet/CSV import and export so users retain control of their data.
+
+### Later — households and power tools
+
+- Add shared household budgets with roles and personal spending areas after the private single-user model is proven.
+- Add customizable dashboards and deeper analytics as opt-in tools, never as required setup.
+- Consider light motivational progress and achievements only if they help habits without distracting from the numbers.
+
+### Simplicity guardrails
+
+- No more than four primary navigation destinations.
+- One prominent action per screen.
+- Advanced features are optional and appear only where their context is clear.
+- User-created organization wins over automatic guesses; automation must be easy to correct.
+- Layout and navigation stay stable between sessions.
+
 ## Technical direction
 
 - Client: Expo SDK 57 with React Native and TypeScript.
@@ -71,3 +115,5 @@ Record decisions here with the date, decision, and reason. Move longer technical
 - 2026-09-20: Manual entry supports both expenses and income, lightweight date and note capture, and explicit save progress. Activity filters must represent real behavior rather than decorative controls.
 - 2026-09-20: Money fields use grouped thousands while typing and left-aligned mobile inputs so plan setup remains easy to scan and edit.
 - 2026-09-20: Manual transactions can be fully edited or deleted with confirmation. Plaid-imported transactions keep their source details protected and only allow category corrections.
+- 2026-09-20: Reddit user research is translated into a progressive roadmap rather than a crowded all-at-once interface. The default product remains a simple monthly overview, with subcategories, rules, reports, goals, net worth, and household sharing introduced contextually in phases.
+- 2026-09-21: Rename the product to Zenify and use the supplied shooting-star mark. Keep the existing hosting slug and native identifiers stable until a dedicated production migration is planned.

@@ -1,7 +1,7 @@
 {
-  "name": "Budget App",
-  "short_name": "Budget",
-  "description": "A clear, private budget for tracking spending and planning each month.",
+  "name": "Zenify",
+  "short_name": "Zenify",
+  "description": "Unify your finances in one simple place and make progress toward your goals.",
   "icons": [
     {
       "src": "/icon-192.png",
@@ -20,6 +20,6 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "theme_color": "#176B45",
+  "theme_color": "#172338",
   "background_color": "#F5F7F3"
 }

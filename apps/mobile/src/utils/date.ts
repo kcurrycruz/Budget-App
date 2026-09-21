@@ -22,3 +22,18 @@ export const formatActivityDate = (dateOnly: string) => {
   if (isSameDay(date, yesterday)) return 'Yesterday';
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
+
+export const currentMonthStart = () => {
+  const now = new Date();
+  return toDateOnly(new Date(now.getFullYear(), now.getMonth(), 1));
+};
+
+export const recurringBillDueDate = (dueDay: number) => {
+  const now = new Date();
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  return new Date(now.getFullYear(), now.getMonth(), Math.min(dueDay, lastDay));
+};
+
+export const formatRecurringDueDate = (dueDay: number) => (
+  recurringBillDueDate(dueDay).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+);

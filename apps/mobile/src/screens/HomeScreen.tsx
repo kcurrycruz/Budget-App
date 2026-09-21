@@ -2,18 +2,22 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ProgressBar } from '../components/ProgressBar';
+import { RecurringBillRow } from '../components/RecurringBillRow';
 import { TransactionRow } from '../components/TransactionRow';
 import { colors, radius, shadow, spacing } from '../theme';
-import type { Category, Transaction } from '../types';
+import type { Category, RecurringBill, Transaction } from '../types';
 import { formatMoney } from '../utils/money';
 
 type HomeScreenProps = {
   categories: Category[];
   transactions: Transaction[];
   income: number;
+  recurringBills: RecurringBill[];
   onAdd: () => void;
   onConnect: () => void;
   onViewTransactions: () => void;
+  onViewPlan: () => void;
+  onToggleBillPaid: (bill: RecurringBill) => void;
   onOpenProfile?: () => void;
   userInitials?: string;
   previewMode?: boolean;
@@ -23,15 +27,20 @@ export function HomeScreen({
   categories,
   transactions,
   income,
+  recurringBills,
   onAdd,
   onConnect,
   onViewTransactions,
+  onViewPlan,
+  onToggleBillPaid,
   onOpenProfile,
   userInitials = 'KC',
   previewMode = false,
 }: HomeScreenProps) {
   const spent = categories.reduce((total, category) => total + category.spent, 0);
   const left = income - spent;
+  const upcomingBills = recurringBills.filter((bill) => !bill.paid).slice(0, 3);
+  const paidBills = recurringBills.filter((bill) => bill.paid).length;
 
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -113,6 +122,36 @@ export function HomeScreen({
         })}
       </ScrollView>
 
+      {recurringBills.length ? (
+        <>
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>Upcoming bills</Text>
+              <Text style={styles.sectionDetail}>{paidBills} of {recurringBills.length} paid this month</Text>
+            </View>
+            <Pressable onPress={onViewPlan}><Text style={styles.link}>Manage</Text></Pressable>
+          </View>
+          <View style={styles.billCard}>
+            {upcomingBills.length ? upcomingBills.map((bill, index) => (
+              <View key={bill.id}>
+                <RecurringBillRow bill={bill} compact onTogglePaid={() => onToggleBillPaid(bill)} />
+                {index < upcomingBills.length - 1 ? <View style={styles.billDivider} /> : null}
+              </View>
+            )) : (
+              <View style={styles.allPaidRow}>
+                <View style={styles.allPaidIcon}>
+                  <MaterialCommunityIcons color={colors.primary} name="check-all" size={22} />
+                </View>
+                <View style={styles.allPaidCopy}>
+                  <Text style={styles.allPaidTitle}>All bills are checked off</Text>
+                  <Text style={styles.allPaidDetail}>Nice work—this month is covered.</Text>
+                </View>
+              </View>
+            )}
+          </View>
+        </>
+      ) : null}
+
       <View style={styles.sectionHeader}>
         <View>
           <Text style={styles.sectionTitle}>Recent activity</Text>
@@ -173,4 +212,11 @@ const styles = StyleSheet.create({
   link: { color: colors.primary, fontSize: 13, fontWeight: '800' },
   activityCard: { backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.lg },
   divider: { backgroundColor: colors.border, height: StyleSheet.hairlineWidth, marginLeft: 56 },
+  billCard: { backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.lg },
+  billDivider: { backgroundColor: colors.border, height: StyleSheet.hairlineWidth, marginLeft: 38 },
+  allPaidRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.lg },
+  allPaidIcon: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.pill, height: 40, justifyContent: 'center', width: 40 },
+  allPaidCopy: { flex: 1, gap: 2 },
+  allPaidTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  allPaidDetail: { color: colors.inkMuted, fontSize: 11 },
 });

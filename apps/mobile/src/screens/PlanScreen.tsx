@@ -2,23 +2,39 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ProgressBar } from '../components/ProgressBar';
+import { RecurringBillRow } from '../components/RecurringBillRow';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { colors, radius, spacing } from '../theme';
-import type { Category } from '../types';
+import type { Category, RecurringBill } from '../types';
 import { formatMoney } from '../utils/money';
 
 type PlanScreenProps = {
   categories: Category[];
   income: number;
   bills: number;
+  recurringBills: RecurringBill[];
+  onAddBill: () => void;
   onEdit: () => void;
+  onEditBill: (bill: RecurringBill) => void;
+  onToggleBillPaid: (bill: RecurringBill) => void;
 };
 
-export function PlanScreen({ categories, income, bills, onEdit }: PlanScreenProps) {
+export function PlanScreen({
+  categories,
+  income,
+  bills,
+  recurringBills,
+  onAddBill,
+  onEdit,
+  onEditBill,
+  onToggleBillPaid,
+}: PlanScreenProps) {
   const flexibleBudget = categories.reduce((sum, category) => sum + category.budget, 0);
   const planned = bills + flexibleBudget;
   const buffer = income - planned;
   const plannedRatio = income > 0 ? Math.min(planned / income, 1) : 0;
+  const recurringTotal = recurringBills.reduce((sum, bill) => sum + bill.amount, 0);
+  const paidCount = recurringBills.filter((bill) => bill.paid).length;
 
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -61,6 +77,43 @@ export function PlanScreen({ categories, income, bills, onEdit }: PlanScreenProp
         </View>
         <MaterialCommunityIcons color={colors.inkMuted} name="chevron-right" size={22} />
       </View>
+
+      <View style={styles.sectionTitleRow}>
+        <View>
+          <Text style={styles.sectionTitle}>Recurring bills</Text>
+          <Text style={styles.sectionCaption}>
+            {recurringBills.length ? `${paidCount} of ${recurringBills.length} paid · ${formatMoney(recurringTotal)} listed` : 'Keep due dates in one place'}
+          </Text>
+        </View>
+        <Pressable accessibilityLabel="Add recurring bill" onPress={onAddBill} style={styles.addBillButton}>
+          <MaterialCommunityIcons color={colors.primaryDark} name="plus" size={18} />
+          <Text style={styles.addBillText}>Add</Text>
+        </Pressable>
+      </View>
+      {recurringBills.length ? (
+        <View style={styles.billList}>
+          {recurringBills.map((bill, index) => (
+            <View key={bill.id}>
+              <RecurringBillRow
+                bill={bill}
+                onEdit={() => onEditBill(bill)}
+                onTogglePaid={() => onToggleBillPaid(bill)}
+              />
+              {index < recurringBills.length - 1 ? <View style={styles.billDivider} /> : null}
+            </View>
+          ))}
+        </View>
+      ) : (
+        <Pressable onPress={onAddBill} style={styles.emptyBills}>
+          <View style={styles.emptyBillIcon}>
+            <MaterialCommunityIcons color={colors.primary} name="calendar-plus" size={24} />
+          </View>
+          <View style={styles.emptyBillCopy}>
+            <Text style={styles.emptyBillTitle}>Add your first monthly bill</Text>
+            <Text style={styles.emptyBillDetail}>Track due dates and check bills off as you pay them.</Text>
+          </View>
+        </Pressable>
+      )}
 
       <View style={styles.sectionTitleRow}>
         <Text style={styles.sectionTitle}>Flexible spending</Text>
@@ -114,12 +167,22 @@ const styles = StyleSheet.create({
   planDetail: { color: '#BFD8C9', fontSize: 12 },
   sectionTitleRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: -spacing.md },
   sectionTitle: { color: colors.ink, fontSize: 18, fontWeight: '800' },
+  sectionCaption: { color: colors.inkMuted, fontSize: 11, marginTop: 3 },
   sectionValue: { color: colors.inkMuted, fontSize: 14, fontWeight: '800' },
   fixedCard: { alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md, flexDirection: 'row', gap: spacing.md, padding: spacing.lg },
   fixedIcon: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.md, height: 48, justifyContent: 'center', width: 48 },
   fixedCopy: { flex: 1, gap: 3 },
   fixedTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' },
   fixedDetail: { color: colors.inkMuted, fontSize: 12, lineHeight: 17 },
+  addBillButton: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.pill, flexDirection: 'row', gap: 3, paddingHorizontal: 11, paddingVertical: 8 },
+  addBillText: { color: colors.primaryDark, fontSize: 12, fontWeight: '800' },
+  billList: { backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.lg },
+  billDivider: { backgroundColor: colors.border, height: StyleSheet.hairlineWidth, marginLeft: 38 },
+  emptyBills: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderStyle: 'dashed', borderWidth: 1, flexDirection: 'row', gap: spacing.md, padding: spacing.lg },
+  emptyBillIcon: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.md, height: 46, justifyContent: 'center', width: 46 },
+  emptyBillCopy: { flex: 1, gap: 3 },
+  emptyBillTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  emptyBillDetail: { color: colors.inkMuted, fontSize: 11, lineHeight: 16 },
   categoryList: { backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.lg },
   categoryRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.lg },
   icon: { alignItems: 'center', borderRadius: radius.md, height: 42, justifyContent: 'center', width: 42 },
