@@ -18,7 +18,7 @@ const tabs: Array<{ id: AppTab; label: string; icon: keyof typeof MaterialCommun
 
 export function BottomNav({ activeTab, onChange }: BottomNavProps) {
   return (
-    <View style={styles.container}>
+    <View style={styles.container} testID="bottom-navigation">
       {tabs.map((tab) => {
         const active = tab.id === activeTab;
         return (
