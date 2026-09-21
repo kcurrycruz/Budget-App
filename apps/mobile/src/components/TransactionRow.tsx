@@ -14,6 +14,8 @@ type TransactionRowProps = {
 export function TransactionRow({ transaction, category, onPress }: TransactionRowProps) {
   const isInflow = transaction.direction === 'inflow';
   const displayCategory = isInflow ? 'Income' : category?.name ?? 'Uncategorized';
+  const subcategory = category?.subcategories.find((item) => item.id === transaction.subcategoryId);
+  const categoryLabel = subcategory ? `${displayCategory} / ${subcategory.name}` : displayCategory;
   return (
     <Pressable
       accessibilityHint={onPress ? 'Opens category selection' : undefined}
@@ -35,7 +37,7 @@ export function TransactionRow({ transaction, category, onPress }: TransactionRo
           {transaction.pending ? <Text style={styles.pending}>Pending</Text> : null}
           {transaction.needsReview ? <Text style={styles.review}>Review</Text> : null}
         </View>
-        <Text style={styles.meta}>{displayCategory} · {transaction.date}</Text>
+        <Text style={styles.meta}>{categoryLabel} · {transaction.date}</Text>
       </View>
       <Text style={[styles.amount, isInflow && styles.inflow]}>{isInflow ? '+' : '−'}{formatMoney(transaction.amount, true)}</Text>
       {onPress ? <MaterialCommunityIcons color={colors.inkMuted} name="chevron-right" size={19} /> : null}

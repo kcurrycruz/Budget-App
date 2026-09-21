@@ -16,6 +16,7 @@ type PlanScreenProps = {
   onAddBill: () => void;
   onEdit: () => void;
   onEditBill: (bill: RecurringBill) => void;
+  onManageCategories: () => void;
   onToggleBillPaid: (bill: RecurringBill) => void;
 };
 
@@ -27,6 +28,7 @@ export function PlanScreen({
   onAddBill,
   onEdit,
   onEditBill,
+  onManageCategories,
   onToggleBillPaid,
 }: PlanScreenProps) {
   const flexibleBudget = categories.reduce((sum, category) => sum + category.budget, 0);
@@ -116,8 +118,14 @@ export function PlanScreen({
       )}
 
       <View style={styles.sectionTitleRow}>
-        <Text style={styles.sectionTitle}>Flexible spending</Text>
-        <Text style={styles.sectionValue}>{formatMoney(flexibleBudget)}</Text>
+        <View>
+          <Text style={styles.sectionTitle}>Flexible spending</Text>
+          <Text style={styles.sectionCaption}>{formatMoney(flexibleBudget)} planned</Text>
+        </View>
+        <Pressable accessibilityLabel="Manage spending categories" onPress={onManageCategories} style={styles.addBillButton}>
+          <MaterialCommunityIcons color={colors.primaryDark} name="shape-outline" size={17} />
+          <Text style={styles.addBillText}>Manage</Text>
+        </Pressable>
       </View>
       <View style={styles.categoryList}>
         {categories.map((category, index) => (
@@ -135,6 +143,7 @@ export function PlanScreen({
                   <Text style={styles.categoryName}>{category.name}</Text>
                   <Text style={styles.categoryAmount}>{formatMoney(category.spent)} / {formatMoney(category.budget)}</Text>
                 </View>
+                {category.subcategories.length ? <Text style={styles.categoryDetail}>{category.subcategories.map((item) => item.name).join(' · ')}</Text> : null}
                 <ProgressBar color={category.color} value={category.spent / category.budget} />
               </View>
             </View>
@@ -189,6 +198,7 @@ const styles = StyleSheet.create({
   categoryCopy: { flex: 1, gap: spacing.sm },
   categoryTop: { flexDirection: 'row', justifyContent: 'space-between' },
   categoryName: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  categoryDetail: { color: colors.inkMuted, fontSize: 10, lineHeight: 14 },
   categoryAmount: { color: colors.inkMuted, fontSize: 12, fontWeight: '700' },
   divider: { backgroundColor: colors.border, height: StyleSheet.hairlineWidth, marginLeft: 54 },
   tipCard: { alignItems: 'flex-start', backgroundColor: colors.primarySoft, borderRadius: radius.md, flexDirection: 'row', gap: spacing.md, padding: spacing.lg },

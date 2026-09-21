@@ -5,12 +5,15 @@ import { Alert, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-na
 
 import { AddTransactionModal } from './src/components/AddTransactionModal';
 import { BottomNav } from './src/components/BottomNav';
+import { CategoryManagerModal } from './src/components/CategoryManagerModal';
 import { RecurringBillModal } from './src/components/RecurringBillModal';
 import { ReviewTransactionModal } from './src/components/ReviewTransactionModal';
 import {
   categorizeTransaction,
+  createCategory as createBudgetCategory,
   createManualTransaction,
   createRecurringBill,
+  createSubcategory,
   deleteManualTransaction,
   deleteRecurringBill,
   exportCloudBudget,
@@ -18,7 +21,9 @@ import {
   saveMonthlyPlan,
   setRecurringBillPaid,
   updateManualTransaction,
+  updateCategory as updateBudgetCategory,
   updateRecurringBill,
+  updateSubcategory,
 } from './src/data/budgetRepository';
 import { accounts, initialCategories, initialRecurringBills, initialTransactions, monthlyBills, monthlyIncome } from './src/data/demo';
 import { isCloudConfigured, supabase } from './src/lib/supabase';
@@ -32,7 +37,7 @@ import { PlanSetupScreen } from './src/screens/PlanSetupScreen';
 import { TransactionsScreen } from './src/screens/TransactionsScreen';
 import { UpdatePasswordScreen } from './src/screens/UpdatePasswordScreen';
 import { colors } from './src/theme';
-import type { AppTab, ManualTransactionDraft, RecurringBill, RecurringBillDraft, Transaction } from './src/types';
+import type { AppTab, Category, CategoryDraft, ManualTransactionDraft, RecurringBill, RecurringBillDraft, Subcategory, Transaction } from './src/types';
 import { formatActivityDate } from './src/utils/date';
 
 export default function App() {
@@ -88,6 +93,7 @@ function BudgetApp({ session }: BudgetAppProps) {
   const [billSaving, setBillSaving] = useState(false);
   const [editingBill, setEditingBill] = useState<RecurringBill | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [reviewTransaction, setReviewTransaction] = useState<Transaction | null>(null);
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reviewDeleting, setReviewDeleting] = useState(false);
@@ -127,6 +133,7 @@ function BudgetApp({ session }: BudgetAppProps) {
               merchant: draft.merchant,
               amount: draft.amount,
               categoryId: draft.categoryId,
+              subcategoryId: draft.subcategoryId,
               direction: draft.direction,
               date: formatActivityDate(draft.transactionDate),
               note: draft.note || undefined,
@@ -141,6 +148,7 @@ function BudgetApp({ session }: BudgetAppProps) {
               merchant: draft.merchant,
               amount: draft.amount,
               categoryId: draft.categoryId,
+              subcategoryId: draft.subcategoryId,
               direction: draft.direction,
               date: formatActivityDate(draft.transactionDate),
               account: 'Manual entry',
@@ -312,17 +320,17 @@ function BudgetApp({ session }: BudgetAppProps) {
     );
   };
 
-  const saveTransactionCategory = async (categoryId: string) => {
+  const saveTransactionCategory = async (categoryId: string, subcategoryId?: string) => {
     if (!reviewTransaction) return;
     setReviewSaving(true);
     try {
-      if (session) await categorizeTransaction(reviewTransaction.id, categoryId);
+      if (session) await categorizeTransaction(reviewTransaction.id, categoryId, subcategoryId);
 
       const previousCategoryId = reviewTransaction.categoryId;
       const affectsSpending = reviewTransaction.direction !== 'inflow';
       setTransactions((current) => current.map((transaction) => (
         transaction.id === reviewTransaction.id
-          ? { ...transaction, categoryId, needsReview: false }
+          ? { ...transaction, categoryId, subcategoryId, needsReview: false }
           : transaction
       )));
       if (affectsSpending && previousCategoryId !== categoryId) {
@@ -342,6 +350,37 @@ function BudgetApp({ session }: BudgetAppProps) {
     } finally {
       setReviewSaving(false);
     }
+  };
+
+  const saveCategory = async (category: Category | null, draft: CategoryDraft) => {
+    if (category) {
+      if (session) await updateBudgetCategory(category.id, draft);
+      setCategories((current) => current.map((item) => item.id === category.id ? { ...item, ...draft } : item));
+      return;
+    }
+
+    const created = session
+      ? await createBudgetCategory(draft, (categories.length + 1) * 10)
+      : { id: `category-${Date.now()}`, ...draft, budget: 0, spent: 0, subcategories: [] } satisfies Category;
+    setCategories((current) => [...current, created]);
+  };
+
+  const saveSubcategory = async (categoryId: string, name: string, subcategory?: Subcategory) => {
+    if (subcategory) {
+      const saved = session ? await updateSubcategory(subcategory.id, name) : { ...subcategory, name };
+      setCategories((current) => current.map((category) => category.id === categoryId
+        ? { ...category, subcategories: category.subcategories.map((item) => item.id === subcategory.id ? saved : item) }
+        : category));
+      return;
+    }
+
+    const parent = categories.find((category) => category.id === categoryId);
+    const saved = session
+      ? await createSubcategory(categoryId, name, ((parent?.subcategories.length ?? 0) + 1) * 10)
+      : { id: `subcategory-${Date.now()}`, categoryId, name };
+    setCategories((current) => current.map((category) => category.id === categoryId
+      ? { ...category, subcategories: [...category.subcategories, saved] }
+      : category));
   };
 
   const email = session?.user.email ?? '';
@@ -436,6 +475,7 @@ function BudgetApp({ session }: BudgetAppProps) {
             onAddBill={() => openRecurringBill()}
             onEdit={() => setPlanEditing(true)}
             onEditBill={openRecurringBill}
+            onManageCategories={() => setCategoryManagerOpen(true)}
             onToggleBillPaid={(bill) => { void toggleRecurringBillPaid(bill); }}
             recurringBills={recurringBills}
           />
@@ -489,6 +529,13 @@ function BudgetApp({ session }: BudgetAppProps) {
         onSave={(draft) => { void saveRecurringBill(draft); }}
         saving={billSaving}
         visible={billOpen}
+      />
+      <CategoryManagerModal
+        categories={categories}
+        onClose={() => setCategoryManagerOpen(false)}
+        onSaveCategory={saveCategory}
+        onSaveSubcategory={saveSubcategory}
+        visible={categoryManagerOpen}
       />
       <ReviewTransactionModal
         categories={categories}

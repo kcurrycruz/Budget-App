@@ -103,8 +103,8 @@ export type Database = {
         Row: {
           account_type: string
           available_balance: number | null
-          created_at: string
           connection_status: string
+          created_at: string
           currency_code: string
           current_balance: number | null
           disconnected_at: string | null
@@ -121,8 +121,8 @@ export type Database = {
         Insert: {
           account_type: string
           available_balance?: number | null
-          created_at?: string
           connection_status?: string
+          created_at?: string
           currency_code?: string
           current_balance?: number | null
           disconnected_at?: string | null
@@ -139,8 +139,8 @@ export type Database = {
         Update: {
           account_type?: string
           available_balance?: number | null
-          created_at?: string
           connection_status?: string
+          created_at?: string
           currency_code?: string
           current_balance?: number | null
           disconnected_at?: string | null
@@ -246,6 +246,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      plaid_webhook_events: {
+        Row: {
+          attempts: number
+          body_sha256: string
+          claimed_at: string | null
+          id: string
+          last_error: string | null
+          next_attempt_at: string | null
+          payload: Json
+          plaid_item_id: string | null
+          processed_at: string | null
+          received_at: string
+          status: string
+          updated_at: string
+          webhook_code: string
+          webhook_type: string
+        }
+        Insert: {
+          attempts?: number
+          body_sha256: string
+          claimed_at?: string | null
+          id?: string
+          last_error?: string | null
+          next_attempt_at?: string | null
+          payload: Json
+          plaid_item_id?: string | null
+          processed_at?: string | null
+          received_at?: string
+          status?: string
+          updated_at?: string
+          webhook_code: string
+          webhook_type: string
+        }
+        Update: {
+          attempts?: number
+          body_sha256?: string
+          claimed_at?: string | null
+          id?: string
+          last_error?: string | null
+          next_attempt_at?: string | null
+          payload?: Json
+          plaid_item_id?: string | null
+          processed_at?: string | null
+          received_at?: string
+          status?: string
+          updated_at?: string
+          webhook_code?: string
+          webhook_type?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -361,6 +412,54 @@ export type Database = {
           },
         ]
       }
+      subcategories: {
+        Row: {
+          archived_at: string | null
+          category_id: string
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          archived_at?: string | null
+          category_id: string
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          archived_at?: string | null
+          category_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subcategories_category_owner_fkey"
+            columns: ["category_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "subcategories_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transactions: {
         Row: {
           amount: number
@@ -377,6 +476,7 @@ export type Database = {
           plaid_category_primary: string | null
           plaid_transaction_id: string | null
           source: string
+          subcategory_id: string | null
           transaction_date: string
           updated_at: string
           user_id: string
@@ -396,6 +496,7 @@ export type Database = {
           plaid_category_primary?: string | null
           plaid_transaction_id?: string | null
           source?: string
+          subcategory_id?: string | null
           transaction_date?: string
           updated_at?: string
           user_id?: string
@@ -415,6 +516,7 @@ export type Database = {
           plaid_category_primary?: string | null
           plaid_transaction_id?: string | null
           source?: string
+          subcategory_id?: string | null
           transaction_date?: string
           updated_at?: string
           user_id?: string
@@ -435,6 +537,13 @@ export type Database = {
             referencedColumns: ["id", "user_id"]
           },
           {
+            foreignKeyName: "transactions_subcategory_owner_fkey"
+            columns: ["subcategory_id", "category_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id", "category_id", "user_id"]
+          },
+          {
             foreignKeyName: "transactions_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
@@ -448,7 +557,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      authorize_plaid_webhook_retry: {
+        Args: { p_secret: string }
+        Returns: boolean
+      }
+      claim_plaid_webhook_events: {
+        Args: { p_batch_size?: number }
+        Returns: {
+          attempts: number
+          id: string
+          payload: Json
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
@@ -458,6 +578,7 @@ export type Database = {
     }
   }
 }
+
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
 
 type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]

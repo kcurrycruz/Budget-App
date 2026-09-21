@@ -30,6 +30,7 @@ export function AddTransactionModal({ categories, initialTransaction, visible, s
   const [merchant, setMerchant] = useState('');
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState(categories[0]?.id ?? 'other');
+  const [subcategoryId, setSubcategoryId] = useState('');
   const [direction, setDirection] = useState<'outflow' | 'inflow'>('outflow');
   const [transactionDate, setTransactionDate] = useState(toDateOnly(new Date()));
   const [note, setNote] = useState('');
@@ -39,6 +40,7 @@ export function AddTransactionModal({ categories, initialTransaction, visible, s
       setMerchant(initialTransaction.merchant);
       setAmount(formatMoneyInput(String(initialTransaction.amount)));
       setCategoryId(initialTransaction.categoryId || categories[0]?.id || 'other');
+      setSubcategoryId(initialTransaction.subcategoryId ?? '');
       setDirection(initialTransaction.direction ?? 'outflow');
       setTransactionDate(initialTransaction.transactionDate ?? toDateOnly(new Date()));
       setNote(initialTransaction.note ?? '');
@@ -46,6 +48,7 @@ export function AddTransactionModal({ categories, initialTransaction, visible, s
       setMerchant('');
       setAmount('');
       setCategoryId(categories[0]?.id ?? 'other');
+      setSubcategoryId('');
       setDirection('outflow');
       setTransactionDate(toDateOnly(new Date()));
       setNote('');
@@ -66,6 +69,7 @@ export function AddTransactionModal({ categories, initialTransaction, visible, s
   ];
 
   const numericAmount = parseMoneyInput(amount);
+  const selectedCategory = categories.find((category) => category.id === categoryId);
   const canSave = !saving && merchant.trim().length > 0 && Number.isFinite(numericAmount) && numericAmount > 0;
 
   const save = () => {
@@ -74,6 +78,7 @@ export function AddTransactionModal({ categories, initialTransaction, visible, s
       merchant: merchant.trim(),
       amount: numericAmount,
       categoryId: direction === 'outflow' ? categoryId : '',
+      subcategoryId: direction === 'outflow' ? subcategoryId || undefined : undefined,
       direction,
       note: note.trim(),
       transactionDate,
@@ -152,7 +157,10 @@ export function AddTransactionModal({ categories, initialTransaction, visible, s
                       accessibilityRole="radio"
                       accessibilityState={{ checked: selected }}
                       key={category.id}
-                      onPress={() => setCategoryId(category.id)}
+                      onPress={() => {
+                        setCategoryId(category.id);
+                        setSubcategoryId('');
+                      }}
                       style={[styles.category, selected && styles.categorySelected]}
                     >
                       <MaterialCommunityIcons
@@ -161,6 +169,36 @@ export function AddTransactionModal({ categories, initialTransaction, visible, s
                         size={18}
                       />
                       <Text style={[styles.categoryText, selected && styles.categoryTextSelected]}>{category.name}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          ) : null}
+
+          {direction === 'outflow' && selectedCategory?.subcategories.length ? (
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Subcategory <Text style={styles.optional}>(optional)</Text></Text>
+              <View style={styles.categories}>
+                <Pressable
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: !subcategoryId }}
+                  onPress={() => setSubcategoryId('')}
+                  style={[styles.category, !subcategoryId && styles.categorySelected]}
+                >
+                  <Text style={[styles.categoryText, !subcategoryId && styles.categoryTextSelected]}>None</Text>
+                </Pressable>
+                {selectedCategory.subcategories.map((subcategory) => {
+                  const selected = subcategory.id === subcategoryId;
+                  return (
+                    <Pressable
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: selected }}
+                      key={subcategory.id}
+                      onPress={() => setSubcategoryId(subcategory.id)}
+                      style={[styles.category, selected && styles.categorySelected]}
+                    >
+                      <Text style={[styles.categoryText, selected && styles.categoryTextSelected]}>{subcategory.name}</Text>
                     </Pressable>
                   );
                 })}

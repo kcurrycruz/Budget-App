@@ -14,7 +14,7 @@ type ReviewTransactionModalProps = {
   onClose: () => void;
   onDelete: () => void;
   onEdit: () => void;
-  onSave: (categoryId: string) => void;
+  onSave: (categoryId: string, subcategoryId?: string) => void;
 };
 
 export function ReviewTransactionModal({
@@ -28,15 +28,18 @@ export function ReviewTransactionModal({
   onSave,
 }: ReviewTransactionModalProps) {
   const [categoryId, setCategoryId] = useState('');
+  const [subcategoryId, setSubcategoryId] = useState('');
 
   useEffect(() => {
     setCategoryId(transaction?.categoryId ?? '');
+    setSubcategoryId(transaction?.subcategoryId ?? '');
   }, [transaction]);
 
   if (!transaction) return null;
   const isInflow = transaction.direction === 'inflow';
   const isManual = transaction.source === 'manual';
   const busy = saving || deleting;
+  const selectedCategory = categories.find((category) => category.id === categoryId);
 
   return (
     <Modal animationType="slide" onRequestClose={onClose} presentationStyle="pageSheet" visible>
@@ -80,7 +83,10 @@ export function ReviewTransactionModal({
                   accessibilityRole="radio"
                   accessibilityState={{ checked: selected }}
                   key={category.id}
-                  onPress={() => setCategoryId(category.id)}
+                  onPress={() => {
+                    setCategoryId(category.id);
+                    setSubcategoryId('');
+                  }}
                   style={[styles.category, selected && styles.categorySelected]}
                 >
                   <View style={[styles.categoryIcon, selected && styles.categoryIconSelected]}>
@@ -98,10 +104,25 @@ export function ReviewTransactionModal({
           </View>
         </View> : null}
 
+        {!isInflow && selectedCategory?.subcategories.length ? <View style={styles.fieldGroup}>
+          <Text style={styles.fieldLabel}>Subcategory <Text style={styles.optional}>(optional)</Text></Text>
+          <View style={styles.subcategories}>
+            <Pressable onPress={() => setSubcategoryId('')} style={[styles.subcategory, !subcategoryId && styles.subcategorySelected]}>
+              <Text style={[styles.subcategoryText, !subcategoryId && styles.subcategoryTextSelected]}>None</Text>
+            </Pressable>
+            {selectedCategory.subcategories.map((subcategory) => {
+              const selected = subcategory.id === subcategoryId;
+              return <Pressable key={subcategory.id} onPress={() => setSubcategoryId(subcategory.id)} style={[styles.subcategory, selected && styles.subcategorySelected]}>
+                <Text style={[styles.subcategoryText, selected && styles.subcategoryTextSelected]}>{subcategory.name}</Text>
+              </Pressable>;
+            })}
+          </View>
+        </View> : null}
+
         {!isInflow ? (
           <Pressable
             disabled={!categoryId || busy}
-            onPress={() => onSave(categoryId)}
+            onPress={() => onSave(categoryId, subcategoryId || undefined)}
             style={[styles.saveButton, (!categoryId || busy) && styles.saveButtonDisabled]}
           >
             <Text style={styles.saveButtonText}>{saving ? 'Saving…' : 'Save category'}</Text>
@@ -144,6 +165,12 @@ const styles = StyleSheet.create({
   amount: { color: colors.ink, fontSize: 34, fontWeight: '800', marginTop: spacing.xs },
   account: { color: colors.inkMuted, fontSize: 12, marginTop: spacing.sm },
   note: { backgroundColor: colors.surfaceMuted, borderRadius: radius.sm, color: colors.inkMuted, fontSize: 12, lineHeight: 18, marginTop: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, textAlign: 'center' },
+  optional: { color: colors.inkMuted, fontWeight: '500' },
+  subcategories: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  subcategory: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 9 },
+  subcategorySelected: { backgroundColor: colors.primary, borderColor: colors.primary },
+  subcategoryText: { color: colors.ink, fontSize: 12, fontWeight: '700' },
+  subcategoryTextSelected: { color: colors.white },
   guidance: { alignItems: 'flex-start', backgroundColor: colors.primarySoft, borderRadius: radius.md, flexDirection: 'row', gap: spacing.md, padding: spacing.lg },
   guidanceText: { color: colors.primaryDark, flex: 1, fontSize: 12, lineHeight: 18 },
   fieldGroup: { gap: spacing.md },

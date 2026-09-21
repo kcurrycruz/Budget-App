@@ -27,10 +27,10 @@ export function TransactionsScreen({ categories, transactions, onAdd, onReview }
       if (filter === 'review' && !transaction.needsReview) return false;
       if ((filter === 'outflow' || filter === 'inflow') && direction !== filter) return false;
       if (!normalizedQuery) return true;
-      const category = direction === 'inflow'
-        ? 'Income'
-        : categories.find((item) => item.id === transaction.categoryId)?.name ?? 'Uncategorized';
-      return [transaction.merchant, transaction.account, category]
+      const parentCategory = categories.find((item) => item.id === transaction.categoryId);
+      const category = direction === 'inflow' ? 'Income' : parentCategory?.name ?? 'Uncategorized';
+      const subcategory = parentCategory?.subcategories.find((item) => item.id === transaction.subcategoryId)?.name ?? '';
+      return [transaction.merchant, transaction.account, category, subcategory]
         .some((value) => value.toLocaleLowerCase().includes(normalizedQuery));
     });
   }, [categories, filter, query, transactions]);

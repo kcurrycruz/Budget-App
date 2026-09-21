@@ -1,7 +1,7 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
 
 import { supabase } from '../lib/supabase';
-import type { Account, Category, ManualTransactionDraft, RecurringBill, RecurringBillDraft, Transaction } from '../types';
+import type { Account, Category, CategoryDraft, ManualTransactionDraft, RecurringBill, RecurringBillDraft, Transaction } from '../types';
 import { formatActivityDate, toDateOnly } from '../utils/date';
 
 export type CloudBudgetData = {
@@ -45,6 +45,13 @@ type TransactionRow = {
   pending: boolean;
   source: 'manual' | 'plaid';
   note: string | null;
+  subcategory_id: string | null;
+};
+
+type SubcategoryRow = {
+  id: string;
+  category_id: string;
+  name: string;
 };
 
 type RecurringBillRow = {
@@ -93,20 +100,22 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
   const client = requireClient();
   const { start, end } = getMonthBounds();
 
-  const [monthResult, categoriesResult, accountsResult, transactionsResult, billsResult, billPaymentsResult] = await Promise.all([
+  const [monthResult, categoriesResult, subcategoriesResult, accountsResult, transactionsResult, billsResult, billPaymentsResult] = await Promise.all([
     client.from('budget_months').select('expected_income, fixed_costs').eq('month', start).maybeSingle(),
     client.from('categories').select('id, name, color, icon, monthly_limit').is('archived_at', null).order('sort_order'),
+    client.from('subcategories').select('id, category_id, name').is('archived_at', null).order('sort_order').order('name'),
     client.from('financial_accounts').select('id, display_name, institution_name, mask, account_type, current_balance, connection_status, plaid_item_id, last_synced_at').is('disconnected_at', null).order('created_at'),
-    client.from('transactions').select('id, merchant_name, category_id, financial_account_id, amount, direction, needs_review, transaction_date, pending, source, note').gte('transaction_date', start).lt('transaction_date', end).order('transaction_date', { ascending: false }).order('created_at', { ascending: false }),
+    client.from('transactions').select('id, merchant_name, category_id, subcategory_id, financial_account_id, amount, direction, needs_review, transaction_date, pending, source, note').gte('transaction_date', start).lt('transaction_date', end).order('transaction_date', { ascending: false }).order('created_at', { ascending: false }),
     client.from('recurring_bills').select('id, name, amount, due_day, category_id').eq('active', true).order('due_day').order('name'),
     client.from('recurring_bill_payments').select('recurring_bill_id, paid_at').eq('month', start),
   ]);
 
-  const error = monthResult.error ?? categoriesResult.error ?? accountsResult.error ?? transactionsResult.error
+  const error = monthResult.error ?? categoriesResult.error ?? subcategoriesResult.error ?? accountsResult.error ?? transactionsResult.error
     ?? billsResult.error ?? billPaymentsResult.error;
   if (error) throw error;
 
   const categoryRows = (categoriesResult.data ?? []) as CategoryRow[];
+  const subcategoryRows = (subcategoriesResult.data ?? []) as SubcategoryRow[];
   const accountRows = (accountsResult.data ?? []) as AccountRow[];
   const transactionRows = (transactionsResult.data ?? []) as TransactionRow[];
   const recurringBillRows = (billsResult.data ?? []) as RecurringBillRow[];
@@ -114,6 +123,11 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
   const billPayments = new Map(paymentRows.map((payment) => [payment.recurring_bill_id, payment.paid_at]));
   const accountNames = new Map(accountRows.map((account) => [account.id, account.display_name]));
   const spending = new Map<string, number>();
+  const subcategoriesByCategory = new Map<string, SubcategoryRow[]>();
+
+  for (const subcategory of subcategoryRows) {
+    subcategoriesByCategory.set(subcategory.category_id, [...(subcategoriesByCategory.get(subcategory.category_id) ?? []), subcategory]);
+  }
 
   for (const transaction of transactionRows) {
     if (!transaction.category_id || transaction.direction === 'inflow') continue;
@@ -127,6 +141,11 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
     icon: category.icon,
     spent: spending.get(category.id) ?? 0,
     budget: Number(category.monthly_limit),
+    subcategories: (subcategoriesByCategory.get(category.id) ?? []).map((subcategory) => ({
+      id: subcategory.id,
+      categoryId: subcategory.category_id,
+      name: subcategory.name,
+    })),
   }));
 
   const accounts: Account[] = accountRows.map((account) => ({
@@ -155,6 +174,7 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
     pending: transaction.pending,
     source: transaction.source,
     note: transaction.note ?? undefined,
+    subcategoryId: transaction.subcategory_id ?? undefined,
     transactionDate: transaction.transaction_date,
   }));
 
@@ -266,11 +286,12 @@ export async function createManualTransaction(draft: ManualTransactionDraft) {
       amount: draft.amount,
       direction: draft.direction,
       category_id: draft.direction === 'outflow' ? draft.categoryId : null,
+      subcategory_id: draft.direction === 'outflow' ? draft.subcategoryId || null : null,
       transaction_date: draft.transactionDate,
       source: 'manual',
       note: draft.note || null,
     })
-    .select('id, merchant_name, category_id, amount, direction, needs_review, transaction_date, pending, source, note')
+    .select('id, merchant_name, category_id, subcategory_id, amount, direction, needs_review, transaction_date, pending, source, note')
     .single();
 
   if (error) throw error;
@@ -287,6 +308,7 @@ export async function createManualTransaction(draft: ManualTransactionDraft) {
     pending: Boolean(data.pending),
     source: data.source as 'manual',
     note: (data.note as string | null) ?? undefined,
+    subcategoryId: (data.subcategory_id as string | null) ?? undefined,
     transactionDate: data.transaction_date as string,
   } satisfies Transaction;
 }
@@ -300,13 +322,14 @@ export async function updateManualTransaction(transactionId: string, draft: Manu
       amount: draft.amount,
       direction: draft.direction,
       category_id: draft.direction === 'outflow' ? draft.categoryId : null,
+      subcategory_id: draft.direction === 'outflow' ? draft.subcategoryId || null : null,
       transaction_date: draft.transactionDate,
       note: draft.note || null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', transactionId)
     .eq('source', 'manual')
-    .select('id, merchant_name, category_id, amount, direction, needs_review, transaction_date, pending, source, note')
+    .select('id, merchant_name, category_id, subcategory_id, amount, direction, needs_review, transaction_date, pending, source, note')
     .single();
 
   if (error) throw error;
@@ -323,6 +346,7 @@ export async function updateManualTransaction(transactionId: string, draft: Manu
     pending: Boolean(data.pending),
     source: data.source as 'manual',
     note: (data.note as string | null) ?? undefined,
+    subcategoryId: (data.subcategory_id as string | null) ?? undefined,
     transactionDate: data.transaction_date as string,
   } satisfies Transaction;
 }
@@ -341,12 +365,13 @@ export async function deleteManualTransaction(transactionId: string) {
   if (!data?.id) throw new Error('The manual transaction could not be deleted.');
 }
 
-export async function categorizeTransaction(transactionId: string, categoryId: string) {
+export async function categorizeTransaction(transactionId: string, categoryId: string, subcategoryId?: string) {
   const client = requireClient();
   const { data, error } = await client
     .from('transactions')
     .update({
       category_id: categoryId,
+      subcategory_id: subcategoryId || null,
       needs_review: false,
       updated_at: new Date().toISOString(),
     })
@@ -356,6 +381,46 @@ export async function categorizeTransaction(transactionId: string, categoryId: s
 
   if (error) throw error;
   if (!data?.id) throw new Error('The transaction could not be updated.');
+}
+
+export async function createCategory(draft: CategoryDraft, sortOrder: number) {
+  const client = requireClient();
+  const { data, error } = await client.from('categories').insert({
+    name: draft.name,
+    color: draft.color,
+    icon: draft.icon,
+    sort_order: sortOrder,
+  }).select('id, name, color, icon, monthly_limit').single();
+  if (error) throw error;
+  return { id: data.id, name: data.name, color: data.color, icon: data.icon, spent: 0, budget: Number(data.monthly_limit), subcategories: [] } satisfies Category;
+}
+
+export async function updateCategory(categoryId: string, draft: CategoryDraft) {
+  const client = requireClient();
+  const { data, error } = await client.from('categories').update({
+    name: draft.name,
+    color: draft.color,
+    icon: draft.icon,
+    updated_at: new Date().toISOString(),
+  }).eq('id', categoryId).select('id, name, color, icon').single();
+  if (error) throw error;
+  return data;
+}
+
+export async function createSubcategory(categoryId: string, name: string, sortOrder: number) {
+  const client = requireClient();
+  const { data, error } = await client.from('subcategories').insert({ category_id: categoryId, name, sort_order: sortOrder })
+    .select('id, category_id, name').single();
+  if (error) throw error;
+  return { id: data.id, categoryId: data.category_id, name: data.name };
+}
+
+export async function updateSubcategory(subcategoryId: string, name: string) {
+  const client = requireClient();
+  const { data, error } = await client.from('subcategories').update({ name, updated_at: new Date().toISOString() })
+    .eq('id', subcategoryId).select('id, category_id, name').single();
+  if (error) throw error;
+  return { id: data.id, categoryId: data.category_id, name: data.name };
 }
 
 export async function saveMonthlyPlan(input: {
@@ -387,17 +452,18 @@ export async function saveMonthlyPlan(input: {
 
 export async function exportCloudBudget() {
   const client = requireClient();
-  const [profileResult, monthsResult, categoriesResult, accountsResult, transactionsResult, recurringBillsResult, recurringBillPaymentsResult] = await Promise.all([
+  const [profileResult, monthsResult, categoriesResult, subcategoriesResult, accountsResult, transactionsResult, recurringBillsResult, recurringBillPaymentsResult] = await Promise.all([
     client.from('profiles').select('full_name, created_at, updated_at').single(),
     client.from('budget_months').select('month, expected_income, fixed_costs, created_at, updated_at').order('month'),
     client.from('categories').select('name, color, icon, monthly_limit, sort_order, archived_at, created_at, updated_at').order('sort_order'),
+    client.from('subcategories').select('name, category_id, sort_order, archived_at, created_at, updated_at').order('sort_order'),
     client.from('financial_accounts').select('display_name, institution_name, mask, account_type, current_balance, currency_code, last_synced_at, disconnected_at, created_at, updated_at').order('created_at'),
-    client.from('transactions').select('merchant_name, amount, direction, needs_review, plaid_category_primary, plaid_category_detailed, transaction_date, pending, source, note, category_id, financial_account_id, created_at, updated_at').order('transaction_date', { ascending: false }),
+    client.from('transactions').select('merchant_name, amount, direction, needs_review, plaid_category_primary, plaid_category_detailed, transaction_date, pending, source, note, category_id, subcategory_id, financial_account_id, created_at, updated_at').order('transaction_date', { ascending: false }),
     client.from('recurring_bills').select('name, amount, due_day, category_id, active, created_at, updated_at').order('due_day'),
     client.from('recurring_bill_payments').select('recurring_bill_id, month, paid_at, created_at').order('month', { ascending: false }),
   ]);
 
-  const error = profileResult.error ?? monthsResult.error ?? categoriesResult.error ?? accountsResult.error
+  const error = profileResult.error ?? monthsResult.error ?? categoriesResult.error ?? subcategoriesResult.error ?? accountsResult.error
     ?? transactionsResult.error ?? recurringBillsResult.error ?? recurringBillPaymentsResult.error;
   if (error) throw error;
 
@@ -406,6 +472,7 @@ export async function exportCloudBudget() {
     profile: profileResult.data,
     monthly_plans: monthsResult.data,
     categories: categoriesResult.data,
+    subcategories: subcategoriesResult.data,
     financial_accounts: accountsResult.data,
     transactions: transactionsResult.data,
     recurring_bills: recurringBillsResult.data,

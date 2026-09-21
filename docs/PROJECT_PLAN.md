@@ -56,8 +56,8 @@ The app will cover the thread's requests through progressive disclosure: the def
 
 ### Next — customization without clutter
 
-- Let users create, rename, reorder, archive, and choose colors/icons for categories.
-- Add optional subcategories for people who want granularity; broad categories remain the default.
+- Let users reorder and archive categories. Creating, renaming, and choosing colors/icons is now available.
+- Optional subcategories are now available for people who want granularity; broad categories remain the default.
 - Add reusable merchant rules so corrected transactions stay categorized the user's way.
 - Support planned one-time expenses alongside recurring bills.
 - Add optional Needs, Wants, Giving, Saving/Investing, and Personal tags across any category.
@@ -117,3 +117,4 @@ Record decisions here with the date, decision, and reason. Move longer technical
 - 2026-09-20: Manual transactions can be fully edited or deleted with confirmation. Plaid-imported transactions keep their source details protected and only allow category corrections.
 - 2026-09-20: Reddit user research is translated into a progressive roadmap rather than a crowded all-at-once interface. The default product remains a simple monthly overview, with subcategories, rules, reports, goals, net worth, and household sharing introduced contextually in phases.
 - 2026-09-21: Rename the product to Zenify and use the supplied shooting-star mark. Keep the existing hosting slug and native identifiers stable until a dedicated production migration is planned.
+- 2026-09-21: Keep budgets attached to broad categories while optional subcategories add transaction detail. This prevents double-counting and keeps the monthly plan easy to scan.

@@ -5,12 +5,26 @@ export type Category = {
   icon: string;
   spent: number;
   budget: number;
+  subcategories: Subcategory[];
+};
+
+export type Subcategory = {
+  id: string;
+  categoryId: string;
+  name: string;
+};
+
+export type CategoryDraft = {
+  name: string;
+  color: string;
+  icon: string;
 };
 
 export type Transaction = {
   id: string;
   merchant: string;
   categoryId: string;
+  subcategoryId?: string;
   amount: number;
   date: string;
   account: string;
@@ -25,6 +39,7 @@ export type Transaction = {
 export type ManualTransactionDraft = {
   amount: number;
   categoryId: string;
+  subcategoryId?: string;
   direction: 'outflow' | 'inflow';
   merchant: string;
   note: string;
