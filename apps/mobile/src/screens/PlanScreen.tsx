@@ -22,6 +22,7 @@ type PlanScreenProps = {
   onEditBill: (bill: RecurringBill) => void;
   onEditPlannedExpense: (expense: PlannedExpense) => void;
   onManageCategories: () => void;
+  onOpenCashFlow: () => void;
   onToggleBillPaid: (bill: RecurringBill) => void;
   onTogglePlannedExpenseCovered: (expense: PlannedExpense) => void;
 };
@@ -38,6 +39,7 @@ export function PlanScreen({
   onEditBill,
   onEditPlannedExpense,
   onManageCategories,
+  onOpenCashFlow,
   onToggleBillPaid,
   onTogglePlannedExpenseCovered,
 }: PlanScreenProps) {
@@ -77,6 +79,17 @@ export function PlanScreen({
         </View>
         <Text style={styles.planDetail}>{formatMoney(income)} expected income</Text>
       </View>
+
+      <Pressable accessibilityLabel="Open cash flow report" onPress={onOpenCashFlow} style={styles.reportCard}>
+        <View style={styles.reportIcon}>
+          <MaterialCommunityIcons color={colors.primaryDark} name="chart-timeline-variant" size={24} />
+        </View>
+        <View style={styles.reportCopy}>
+          <Text style={styles.reportTitle}>Cash-flow report</Text>
+          <Text style={styles.reportDetail}>See what came in, went out, and remains available.</Text>
+        </View>
+        <MaterialCommunityIcons color={colors.inkMuted} name="chevron-right" size={22} />
+      </Pressable>
 
       <View style={styles.sectionTitleRow}>
         <Text style={styles.sectionTitle}>Fixed costs</Text>
@@ -225,6 +238,11 @@ const styles = StyleSheet.create({
   planTrack: { backgroundColor: '#FFFFFF1F', borderRadius: radius.pill, height: 10, overflow: 'hidden' },
   planTrackFill: { backgroundColor: colors.accent, borderRadius: radius.pill, height: '100%' },
   planDetail: { color: '#BFD8C9', fontSize: 12 },
+  reportCard: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, flexDirection: 'row', gap: spacing.md, padding: spacing.lg },
+  reportIcon: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.md, height: 48, justifyContent: 'center', width: 48 },
+  reportCopy: { flex: 1, gap: 3 },
+  reportTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' },
+  reportDetail: { color: colors.inkMuted, fontSize: 11, lineHeight: 16 },
   sectionTitleRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: -spacing.md },
   sectionTitle: { color: colors.ink, fontSize: 18, fontWeight: '800' },
   sectionCaption: { color: colors.inkMuted, fontSize: 11, marginTop: 3 },

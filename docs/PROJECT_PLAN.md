@@ -64,7 +64,7 @@ The app will cover the thread's requests through progressive disclosure: the def
 
 ### Then — one useful financial picture
 
-- Add a cash-flow report that combines income, fixed costs, planned spending, and actual transactions.
+- A simple cash-flow report is now available inside Plan, combining expected and received income, actual spending, one-time set-asides, budget totals, and remaining availability.
 - Add monthly comparisons and simple percentage views for Needs, Wants, and Savings.
 - Add savings goals, sinking funds, and net-worth tracking without putting them on the primary Home screen.
 - Add spreadsheet/CSV import and export so users retain control of their data.
@@ -119,3 +119,4 @@ Record decisions here with the date, decision, and reason. Move longer technical
 - 2026-09-21: Rename the product to Zenify and use the supplied shooting-star mark. Keep the existing hosting slug and native identifiers stable until a dedicated production migration is planned.
 - 2026-09-21: Keep budgets attached to broad categories while optional subcategories add transaction detail. This prevents double-counting and keeps the monthly plan easy to scan.
 - 2026-09-23: Planned one-time expenses use a month-level target and a calculated monthly set-aside. Uncovered set-asides reduce the displayed monthly buffer and available amount without creating a transaction or changing category spending.
+- 2026-09-23: The first cash-flow report stays inside Plan to preserve the four-tab navigation. It separates actual transactions from budget targets and explains that planned set-asides do not create transactions.

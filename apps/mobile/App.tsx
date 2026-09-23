@@ -5,6 +5,7 @@ import { Alert, Platform, Pressable, SafeAreaView, StyleSheet, Text, View } from
 
 import { AddTransactionModal } from './src/components/AddTransactionModal';
 import { BottomNav } from './src/components/BottomNav';
+import { CashFlowReportModal } from './src/components/CashFlowReportModal';
 import { CategoryManagerModal } from './src/components/CategoryManagerModal';
 import { PlannedExpenseModal } from './src/components/PlannedExpenseModal';
 import { RecurringBillModal } from './src/components/RecurringBillModal';
@@ -104,6 +105,7 @@ function BudgetApp({ session }: BudgetAppProps) {
   const [plannedExpenseOpen, setPlannedExpenseOpen] = useState(false);
   const [plannedExpenseSaving, setPlannedExpenseSaving] = useState(false);
   const [editingPlannedExpense, setEditingPlannedExpense] = useState<PlannedExpense | null>(null);
+  const [cashFlowOpen, setCashFlowOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [reviewTransaction, setReviewTransaction] = useState<Transaction | null>(null);
@@ -586,6 +588,7 @@ function BudgetApp({ session }: BudgetAppProps) {
             onEditBill={openRecurringBill}
             onEditPlannedExpense={openPlannedExpense}
             onManageCategories={() => setCategoryManagerOpen(true)}
+            onOpenCashFlow={() => setCashFlowOpen(true)}
             onToggleBillPaid={(bill) => { void toggleRecurringBillPaid(bill); }}
             onTogglePlannedExpenseCovered={(expense) => { void togglePlannedExpenseCovered(expense); }}
             plannedExpenses={plannedExpenses}
@@ -655,6 +658,15 @@ function BudgetApp({ session }: BudgetAppProps) {
         onSave={(draft) => { void savePlannedExpense(draft); }}
         saving={plannedExpenseSaving}
         visible={plannedExpenseOpen}
+      />
+      <CashFlowReportModal
+        bills={bills}
+        categories={categories}
+        income={income}
+        onClose={() => setCashFlowOpen(false)}
+        plannedExpenses={plannedExpenses}
+        transactions={transactions}
+        visible={cashFlowOpen}
       />
       <CategoryManagerModal
         categories={categories}
