@@ -12,6 +12,7 @@ type CashFlowReportModalProps = {
   income: number;
   onClose: () => void;
   plannedExpenses: PlannedExpense[];
+  previousMonthToDateSpent: number;
   transactions: Transaction[];
   visible: boolean;
 };
@@ -44,10 +45,19 @@ export function CashFlowReportModal({
   income,
   onClose,
   plannedExpenses,
+  previousMonthToDateSpent,
   transactions,
   visible,
 }: CashFlowReportModalProps) {
-  const currentMonth = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date());
+  const now = new Date();
+  const currentMonth = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(now);
+  const previousMonth = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(
+    new Date(now.getFullYear(), now.getMonth() - 1, 1),
+  );
+  const previousComparisonDay = Math.min(
+    now.getDate(),
+    new Date(now.getFullYear(), now.getMonth(), 0).getDate(),
+  );
   const received = transactions
     .filter((transaction) => transaction.direction === 'inflow')
     .reduce((sum, transaction) => sum + transaction.amount, 0);
@@ -68,6 +78,20 @@ export function CashFlowReportModal({
   const setAsideWidth = `${(setAside / reference) * 100}%` as `${number}%`;
   const availableWidth = `${(Math.max(available, 0) / reference) * 100}%` as `${number}%`;
   const isOver = available < 0;
+  const comparisonMax = Math.max(spent, previousMonthToDateSpent, 1);
+  const currentComparisonWidth = `${(spent / comparisonMax) * 100}%` as `${number}%`;
+  const previousComparisonWidth = `${(previousMonthToDateSpent / comparisonMax) * 100}%` as `${number}%`;
+  const spendingChange = spent - previousMonthToDateSpent;
+  const spendingChangePercent = previousMonthToDateSpent > 0
+    ? Math.round((Math.abs(spendingChange) / previousMonthToDateSpent) * 100)
+    : null;
+  const spendingTrend = spendingChange === 0 ? 'same' : spendingChange < 0 ? 'down' : 'up';
+  const trendColor = spendingTrend === 'down' ? '#2F7A4D' : spendingTrend === 'up' ? colors.danger : colors.inkMuted;
+  const trendCopy = spendingChangePercent === null
+    ? `No ${previousMonth} spending is available yet.`
+    : spendingTrend === 'same'
+      ? `The same as ${previousMonth} by this date.`
+      : `${spendingChangePercent}% ${spendingTrend === 'down' ? 'less' : 'more'} than ${previousMonth} by this date.`;
 
   return (
     <Modal animationType="slide" onRequestClose={onClose} presentationStyle="pageSheet" visible={visible}>
@@ -136,6 +160,43 @@ export function CashFlowReportModal({
           </View>
         </View>
 
+        <View style={styles.comparisonCard}>
+          <View style={styles.sectionHeading}>
+            <View>
+              <Text style={styles.sectionTitle}>Month-to-month</Text>
+              <Text style={styles.sectionDetail}>{currentMonth} 1–{now.getDate()} vs {previousMonth} 1–{previousComparisonDay}</Text>
+            </View>
+            <View style={[styles.trendBadge, { backgroundColor: `${trendColor}18` }]}>
+              <MaterialCommunityIcons
+                color={trendColor}
+                name={spendingTrend === 'down' ? 'trending-down' : spendingTrend === 'up' ? 'trending-up' : 'minus'}
+                size={19}
+              />
+            </View>
+          </View>
+          <View style={styles.comparisonRow}>
+            <View style={styles.comparisonLabelRow}>
+              <Text style={styles.comparisonLabel}>{currentMonth}</Text>
+              <Text style={styles.comparisonValue}>{formatMoney(spent)}</Text>
+            </View>
+            <View style={styles.comparisonTrack}>
+              <View style={[styles.comparisonBar, styles.currentComparisonBar, { width: currentComparisonWidth }]} />
+            </View>
+          </View>
+          <View style={styles.comparisonRow}>
+            <View style={styles.comparisonLabelRow}>
+              <Text style={styles.comparisonLabel}>{previousMonth}</Text>
+              <Text style={styles.comparisonValue}>{formatMoney(previousMonthToDateSpent)}</Text>
+            </View>
+            <View style={styles.comparisonTrack}>
+              <View style={[styles.comparisonBar, styles.previousComparisonBar, { width: previousComparisonWidth }]} />
+            </View>
+          </View>
+          <View style={[styles.trendMessage, { backgroundColor: `${trendColor}12` }]}>
+            <Text style={[styles.trendMessageText, { color: trendColor }]}>{trendCopy}</Text>
+          </View>
+        </View>
+
         <View style={styles.planCard}>
           <View style={styles.sectionHeading}>
             <View>
@@ -199,6 +260,18 @@ const styles = StyleSheet.create({
   summaryLabel: { color: colors.inkMuted, fontSize: 11, fontWeight: '700' },
   summaryValue: { color: colors.ink, fontSize: 21, fontWeight: '800', marginTop: 4 },
   summaryDetail: { color: colors.inkMuted, fontSize: 10, lineHeight: 14, marginTop: 3 },
+  comparisonCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, padding: spacing.lg },
+  trendBadge: { alignItems: 'center', borderRadius: radius.pill, height: 36, justifyContent: 'center', width: 36 },
+  comparisonRow: { gap: spacing.sm, marginBottom: spacing.lg },
+  comparisonLabelRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  comparisonLabel: { color: colors.inkMuted, fontSize: 12, fontWeight: '700' },
+  comparisonValue: { color: colors.ink, fontSize: 13, fontWeight: '800' },
+  comparisonTrack: { backgroundColor: colors.surfaceMuted, borderRadius: radius.pill, height: 10, overflow: 'hidden' },
+  comparisonBar: { borderRadius: radius.pill, height: '100%' },
+  currentComparisonBar: { backgroundColor: colors.primary },
+  previousComparisonBar: { backgroundColor: '#A9C8B4' },
+  trendMessage: { borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  trendMessageText: { fontSize: 11, fontWeight: '700', lineHeight: 16 },
   planCard: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.lg },
   planDivider: { backgroundColor: colors.ink, height: 1, marginVertical: spacing.xs, opacity: 0.14 },
   noteCard: { alignItems: 'flex-start', backgroundColor: colors.primarySoft, borderRadius: radius.md, flexDirection: 'row', gap: spacing.md, padding: spacing.lg },

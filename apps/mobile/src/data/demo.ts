@@ -2,6 +2,7 @@ import type { Account, Category, PlannedExpense, RecurringBill, Transaction } fr
 
 export const monthlyIncome = 7000;
 export const monthlyBills = 2780;
+export const previousMonthToDateSpent = 3140;
 
 export const initialRecurringBills: RecurringBill[] = [
   { id: 'b1', name: 'Rent', amount: 1850, dueDay: 1, categoryId: 'home', paid: true, paidAt: '2026-09-01T12:00:00Z' },

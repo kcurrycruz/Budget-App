@@ -33,7 +33,7 @@ import {
   updateRecurringBill,
   updateSubcategory,
 } from './src/data/budgetRepository';
-import { accounts, initialCategories, initialPlannedExpenses, initialRecurringBills, initialTransactions, monthlyBills, monthlyIncome } from './src/data/demo';
+import { accounts, initialCategories, initialPlannedExpenses, initialRecurringBills, initialTransactions, monthlyBills, monthlyIncome, previousMonthToDateSpent as demoPreviousMonthToDateSpent } from './src/data/demo';
 import { isCloudConfigured, supabase } from './src/lib/supabase';
 import { AccountScreen } from './src/screens/AccountScreen';
 import { AuthScreen } from './src/screens/AuthScreen';
@@ -90,6 +90,7 @@ function BudgetApp({ session }: BudgetAppProps) {
   const [connectedAccounts, setConnectedAccounts] = useState(cloudMode ? [] : accounts);
   const [income, setIncome] = useState(cloudMode ? 0 : monthlyIncome);
   const [bills, setBills] = useState(cloudMode ? 0 : monthlyBills);
+  const [previousMonthToDateSpent, setPreviousMonthToDateSpent] = useState(cloudMode ? 0 : demoPreviousMonthToDateSpent);
   const [merchantRules, setMerchantRules] = useState<MerchantRule[]>([]);
   const [plannedExpenses, setPlannedExpenses] = useState<PlannedExpense[]>(cloudMode ? [] : initialPlannedExpenses);
   const [recurringBills, setRecurringBills] = useState<RecurringBill[]>(cloudMode ? [] : initialRecurringBills);
@@ -123,6 +124,7 @@ function BudgetApp({ session }: BudgetAppProps) {
       setConnectedAccounts(data.accounts);
       setIncome(data.income);
       setBills(data.bills);
+      setPreviousMonthToDateSpent(data.previousMonthToDateSpent);
       setMerchantRules(data.merchantRules);
       setPlannedExpenses(data.plannedExpenses);
       setRecurringBills(data.recurringBills);
@@ -665,6 +667,7 @@ function BudgetApp({ session }: BudgetAppProps) {
         income={income}
         onClose={() => setCashFlowOpen(false)}
         plannedExpenses={plannedExpenses}
+        previousMonthToDateSpent={previousMonthToDateSpent}
         transactions={transactions}
         visible={cashFlowOpen}
       />

@@ -11,6 +11,7 @@ export type CloudBudgetData = {
   income: number;
   merchantRules: MerchantRule[];
   plannedExpenses: PlannedExpense[];
+  previousMonthToDateSpent: number;
   recurringBills: RecurringBill[];
   transactions: Transaction[];
 };
@@ -106,7 +107,19 @@ const getMonthBounds = () => {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
   const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  return { start: toDateOnly(start), end: toDateOnly(end) };
+  const previousStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const previousLastDay = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+  const previousEnd = new Date(
+    previousStart.getFullYear(),
+    previousStart.getMonth(),
+    Math.min(now.getDate(), previousLastDay) + 1,
+  );
+  return {
+    start: toDateOnly(start),
+    end: toDateOnly(end),
+    previousStart: toDateOnly(previousStart),
+    previousEnd: toDateOnly(previousEnd),
+  };
 };
 
 const requireClient = () => {
@@ -133,21 +146,22 @@ const invokeFunction = async <T>(name: string, body: Record<string, unknown> = {
 
 export async function loadCloudBudget(): Promise<CloudBudgetData> {
   const client = requireClient();
-  const { start, end } = getMonthBounds();
+  const { start, end, previousStart, previousEnd } = getMonthBounds();
 
-  const [monthResult, categoriesResult, subcategoriesResult, accountsResult, transactionsResult, billsResult, billPaymentsResult, merchantRulesResult, plannedExpensesResult] = await Promise.all([
+  const [monthResult, categoriesResult, subcategoriesResult, accountsResult, transactionsResult, previousTransactionsResult, billsResult, billPaymentsResult, merchantRulesResult, plannedExpensesResult] = await Promise.all([
     client.from('budget_months').select('expected_income, fixed_costs').eq('month', start).maybeSingle(),
     client.from('categories').select('id, name, color, icon, monthly_limit').is('archived_at', null).order('sort_order'),
     client.from('subcategories').select('id, category_id, name').is('archived_at', null).order('sort_order').order('name'),
     client.from('financial_accounts').select('id, display_name, institution_name, mask, account_type, current_balance, connection_status, plaid_item_id, last_synced_at').is('disconnected_at', null).order('created_at'),
     client.from('transactions').select('id, merchant_name, category_id, subcategory_id, financial_account_id, amount, direction, needs_review, transaction_date, pending, source, note').gte('transaction_date', start).lt('transaction_date', end).order('transaction_date', { ascending: false }).order('created_at', { ascending: false }),
+    client.from('transactions').select('amount, direction').gte('transaction_date', previousStart).lt('transaction_date', previousEnd),
     client.from('recurring_bills').select('id, name, amount, due_day, category_id').eq('active', true).order('due_day').order('name'),
     client.from('recurring_bill_payments').select('recurring_bill_id, paid_at').eq('month', start),
     client.from('merchant_rules').select('id, merchant_name, category_id, subcategory_id').eq('active', true).order('merchant_name'),
     client.from('planned_expenses').select('id, name, amount, target_month, category_id, covered_at').order('target_month').order('name'),
   ]);
 
-  const error = monthResult.error ?? categoriesResult.error ?? subcategoriesResult.error ?? accountsResult.error ?? transactionsResult.error
+  const error = monthResult.error ?? categoriesResult.error ?? subcategoriesResult.error ?? accountsResult.error ?? transactionsResult.error ?? previousTransactionsResult.error
     ?? billsResult.error ?? billPaymentsResult.error ?? merchantRulesResult.error ?? plannedExpensesResult.error;
   if (error) throw error;
 
@@ -155,6 +169,7 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
   const subcategoryRows = (subcategoriesResult.data ?? []) as SubcategoryRow[];
   const accountRows = (accountsResult.data ?? []) as AccountRow[];
   const transactionRows = (transactionsResult.data ?? []) as TransactionRow[];
+  const previousTransactionRows = (previousTransactionsResult.data ?? []) as Pick<TransactionRow, 'amount' | 'direction'>[];
   const recurringBillRows = (billsResult.data ?? []) as RecurringBillRow[];
   const paymentRows = (billPaymentsResult.data ?? []) as RecurringBillPaymentRow[];
   const merchantRuleRows = (merchantRulesResult.data ?? []) as MerchantRuleRow[];
@@ -226,6 +241,9 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
     paid: billPayments.has(bill.id),
     paidAt: billPayments.get(bill.id),
   }));
+  const previousMonthToDateSpent = previousTransactionRows
+    .filter((transaction) => transaction.direction === 'outflow')
+    .reduce((sum, transaction) => sum + Number(transaction.amount), 0);
 
   return {
     accounts,
@@ -234,6 +252,7 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
     income: Number(monthResult.data?.expected_income ?? 0),
     merchantRules: merchantRuleRows.map(mapMerchantRule),
     plannedExpenses: plannedExpenseRows.map(mapPlannedExpense),
+    previousMonthToDateSpent,
     recurringBills,
     transactions,
   };
