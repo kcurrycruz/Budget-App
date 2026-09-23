@@ -559,7 +559,22 @@ function BudgetApp({ session }: BudgetAppProps) {
   };
 
   const email = session?.user.email ?? '';
-  const userInitials = email ? email.slice(0, 2).toUpperCase() : 'KC';
+  const accountName = String(
+    session?.user.user_metadata.full_name
+    ?? session?.user.user_metadata.name
+    ?? '',
+  ).trim();
+  const emailName = (email.split('@')[0] ?? '')
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(' ');
+  const displayName = accountName || emailName || 'Friend';
+  const firstName = displayName.split(/\s+/)[0] ?? 'Friend';
+  const nameParts = displayName.split(/\s+/).filter(Boolean);
+  const userInitials = nameParts.length > 1
+    ? `${nameParts[0]?.charAt(0)}${nameParts[nameParts.length - 1]?.charAt(0)}`.toUpperCase()
+    : displayName.slice(0, 2).toUpperCase();
   const openProfile = () => {
     if (!session || !supabase) {
       Alert.alert('Preview mode', 'Cloud accounts will appear here after Supabase is connected.');
@@ -626,7 +641,7 @@ function BudgetApp({ session }: BudgetAppProps) {
           accountCount={connectedAccounts.length}
           categories={categories}
           email={email}
-          fullName={String(session.user.user_metadata.full_name ?? '')}
+          fullName={displayName}
           merchantRules={merchantRules}
           onBack={() => setAccountOpen(false)}
           onDelete={deleteAccount}
@@ -691,6 +706,7 @@ function BudgetApp({ session }: BudgetAppProps) {
             transactions={transactions}
             recurringBills={recurringBills}
             userInitials={userInitials}
+            userName={firstName}
           />
         );
     }

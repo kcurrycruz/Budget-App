@@ -23,6 +23,7 @@ type HomeScreenProps = {
   onToggleBillPaid: (bill: RecurringBill) => void;
   onTogglePlannedExpenseCovered: (expense: PlannedExpense) => void;
   onOpenProfile?: () => void;
+  userName?: string;
   userInitials?: string;
   previewMode?: boolean;
 };
@@ -40,6 +41,7 @@ export function HomeScreen({
   onToggleBillPaid,
   onTogglePlannedExpenseCovered,
   onOpenProfile,
+  userName = 'Alex',
   userInitials = 'KC',
   previewMode = false,
 }: HomeScreenProps) {
@@ -51,13 +53,21 @@ export function HomeScreen({
   const upcomingBills = recurringBills.filter((bill) => !bill.paid).slice(0, 3);
   const upcomingExpenses = plannedExpenses.filter((expense) => !expense.covered).slice(0, 2);
   const paidBills = recurringBills.filter((bill) => bill.paid).length;
+  const now = new Date();
+  const hour = now.getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const currentMonth = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(now);
 
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Good afternoon</Text>
-          <Text style={styles.title}>Your September</Text>
+        <View style={styles.headerCopy}>
+          <Text style={styles.greeting}>{greeting},</Text>
+          <Text numberOfLines={1} style={styles.title}>{userName}</Text>
+          <View style={styles.monthLine}>
+            <MaterialCommunityIcons color={colors.inkMuted} name="calendar-blank-outline" size={13} />
+            <Text style={styles.monthText}>{currentMonth} overview</Text>
+          </View>
         </View>
         <Pressable accessibilityLabel="Open account menu" onPress={onOpenProfile} style={styles.avatar}>
           <Text style={styles.avatarText}>{userInitials}</Text>
@@ -224,9 +234,12 @@ export function HomeScreen({
 
 const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.xl },
-  header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.sm },
+  header: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, justifyContent: 'space-between', marginTop: spacing.sm },
+  headerCopy: { flex: 1 },
   greeting: { color: colors.inkMuted, fontSize: 14, fontWeight: '600' },
   title: { color: colors.ink, fontSize: 30, fontWeight: '800', letterSpacing: -0.9, marginTop: 2 },
+  monthLine: { alignItems: 'center', flexDirection: 'row', gap: 5, marginTop: 5 },
+  monthText: { color: colors.inkMuted, fontSize: 11, fontWeight: '700' },
   avatar: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.pill, height: 44, justifyContent: 'center', width: 44 },
   avatarText: { color: colors.primaryDark, fontSize: 14, fontWeight: '800' },
   previewCard: { alignItems: 'flex-start', backgroundColor: colors.primarySoft, borderRadius: radius.md, flexDirection: 'row', gap: spacing.md, padding: spacing.md },

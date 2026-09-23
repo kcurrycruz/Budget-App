@@ -123,3 +123,4 @@ Record decisions here with the date, decision, and reason. Move longer technical
 - 2026-09-23: Month-to-month spending compares the current month through today's date with the same period last month so partial months are not measured against completed months.
 - 2026-09-23: Needs, Wants, and Savings are stored as an editable group on each category. Percentages use categorized spending only, keeping the report transparent when uncategorized transactions still need review.
 - 2026-09-23: Savings goals stay inside Plan and track a target, current saved balance, and target month. The remaining balance creates a monthly goal pace that participates in the plan buffer, while edits remain manual until transaction-linked contributions are introduced.
+- 2026-09-23: Home greets each person by the first name on their account, derives the avatar initials from that name, and shows the current month as a compact overview label instead of a generic “Your September” title.
