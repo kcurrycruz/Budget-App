@@ -2,37 +2,50 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ProgressBar } from '../components/ProgressBar';
+import { PlannedExpenseRow } from '../components/PlannedExpenseRow';
 import { RecurringBillRow } from '../components/RecurringBillRow';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { colors, radius, spacing } from '../theme';
-import type { Category, RecurringBill } from '../types';
+import type { Category, PlannedExpense, RecurringBill } from '../types';
+import { plannedExpenseMonthlyAmount } from '../utils/date';
 import { formatMoney } from '../utils/money';
 
 type PlanScreenProps = {
   categories: Category[];
   income: number;
   bills: number;
+  plannedExpenses: PlannedExpense[];
   recurringBills: RecurringBill[];
   onAddBill: () => void;
+  onAddPlannedExpense: () => void;
   onEdit: () => void;
   onEditBill: (bill: RecurringBill) => void;
+  onEditPlannedExpense: (expense: PlannedExpense) => void;
   onManageCategories: () => void;
   onToggleBillPaid: (bill: RecurringBill) => void;
+  onTogglePlannedExpenseCovered: (expense: PlannedExpense) => void;
 };
 
 export function PlanScreen({
   categories,
   income,
   bills,
+  plannedExpenses,
   recurringBills,
   onAddBill,
+  onAddPlannedExpense,
   onEdit,
   onEditBill,
+  onEditPlannedExpense,
   onManageCategories,
   onToggleBillPaid,
+  onTogglePlannedExpenseCovered,
 }: PlanScreenProps) {
   const flexibleBudget = categories.reduce((sum, category) => sum + category.budget, 0);
-  const planned = bills + flexibleBudget;
+  const plannedSetAside = plannedExpenses
+    .filter((expense) => !expense.covered)
+    .reduce((sum, expense) => sum + plannedExpenseMonthlyAmount(expense.amount, expense.targetMonth), 0);
+  const planned = bills + flexibleBudget + plannedSetAside;
   const buffer = income - planned;
   const plannedRatio = income > 0 ? Math.min(planned / income, 1) : 0;
   const recurringTotal = recurringBills.reduce((sum, bill) => sum + bill.amount, 0);
@@ -113,6 +126,44 @@ export function PlanScreen({
           <View style={styles.emptyBillCopy}>
             <Text style={styles.emptyBillTitle}>Add your first monthly bill</Text>
             <Text style={styles.emptyBillDetail}>Track due dates and check bills off as you pay them.</Text>
+          </View>
+        </Pressable>
+      )}
+
+      <View style={styles.sectionTitleRow}>
+        <View>
+          <Text style={styles.sectionTitle}>Planned expenses</Text>
+          <Text style={styles.sectionCaption}>
+            {plannedExpenses.length ? `${formatMoney(plannedSetAside)} to set aside this month` : 'Prepare for one-time costs'}
+          </Text>
+        </View>
+        <Pressable accessibilityLabel="Add planned expense" onPress={onAddPlannedExpense} style={styles.addBillButton}>
+          <MaterialCommunityIcons color={colors.primaryDark} name="plus" size={18} />
+          <Text style={styles.addBillText}>Add</Text>
+        </Pressable>
+      </View>
+      {plannedExpenses.length ? (
+        <View style={styles.billList}>
+          {plannedExpenses.map((expense, index) => (
+            <View key={expense.id}>
+              <PlannedExpenseRow
+                categories={categories}
+                expense={expense}
+                onEdit={() => onEditPlannedExpense(expense)}
+                onToggleCovered={() => onTogglePlannedExpenseCovered(expense)}
+              />
+              {index < plannedExpenses.length - 1 ? <View style={styles.billDivider} /> : null}
+            </View>
+          ))}
+        </View>
+      ) : (
+        <Pressable onPress={onAddPlannedExpense} style={styles.emptyBills}>
+          <View style={styles.emptyBillIcon}>
+            <MaterialCommunityIcons color={colors.primary} name="calendar-star" size={24} />
+          </View>
+          <View style={styles.emptyBillCopy}>
+            <Text style={styles.emptyBillTitle}>Plan a one-time expense</Text>
+            <Text style={styles.emptyBillDetail}>Add a trip, repair, or purchase and see a simple monthly set-aside.</Text>
           </View>
         </Pressable>
       )}

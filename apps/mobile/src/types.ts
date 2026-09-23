@@ -53,6 +53,23 @@ export type MerchantRule = {
   subcategoryId?: string;
 };
 
+export type PlannedExpense = {
+  id: string;
+  name: string;
+  amount: number;
+  targetMonth: string;
+  categoryId?: string;
+  covered: boolean;
+  coveredAt?: string;
+};
+
+export type PlannedExpenseDraft = {
+  name: string;
+  amount: number;
+  targetMonth: string;
+  categoryId?: string;
+};
+
 export type RecurringBill = {
   id: string;
   name: string;

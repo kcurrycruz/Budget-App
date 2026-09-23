@@ -2,22 +2,26 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ProgressBar } from '../components/ProgressBar';
+import { PlannedExpenseRow } from '../components/PlannedExpenseRow';
 import { RecurringBillRow } from '../components/RecurringBillRow';
 import { TransactionRow } from '../components/TransactionRow';
 import { colors, radius, shadow, spacing } from '../theme';
-import type { Category, RecurringBill, Transaction } from '../types';
+import type { Category, PlannedExpense, RecurringBill, Transaction } from '../types';
+import { plannedExpenseMonthlyAmount } from '../utils/date';
 import { formatMoney } from '../utils/money';
 
 type HomeScreenProps = {
   categories: Category[];
   transactions: Transaction[];
   income: number;
+  plannedExpenses: PlannedExpense[];
   recurringBills: RecurringBill[];
   onAdd: () => void;
   onConnect: () => void;
   onViewTransactions: () => void;
   onViewPlan: () => void;
   onToggleBillPaid: (bill: RecurringBill) => void;
+  onTogglePlannedExpenseCovered: (expense: PlannedExpense) => void;
   onOpenProfile?: () => void;
   userInitials?: string;
   previewMode?: boolean;
@@ -27,19 +31,25 @@ export function HomeScreen({
   categories,
   transactions,
   income,
+  plannedExpenses,
   recurringBills,
   onAdd,
   onConnect,
   onViewTransactions,
   onViewPlan,
   onToggleBillPaid,
+  onTogglePlannedExpenseCovered,
   onOpenProfile,
   userInitials = 'KC',
   previewMode = false,
 }: HomeScreenProps) {
   const spent = categories.reduce((total, category) => total + category.spent, 0);
-  const left = income - spent;
+  const plannedSetAside = plannedExpenses
+    .filter((expense) => !expense.covered)
+    .reduce((sum, expense) => sum + plannedExpenseMonthlyAmount(expense.amount, expense.targetMonth), 0);
+  const left = income - spent - plannedSetAside;
   const upcomingBills = recurringBills.filter((bill) => !bill.paid).slice(0, 3);
+  const upcomingExpenses = plannedExpenses.filter((expense) => !expense.covered).slice(0, 2);
   const paidBills = recurringBills.filter((bill) => bill.paid).length;
 
   return (
@@ -75,9 +85,11 @@ export function HomeScreen({
             <Text style={styles.statusText}>On track</Text>
           </View>
         </View>
-        <ProgressBar color={colors.accent} height={10} value={spent / income} />
+        <ProgressBar color={colors.accent} height={10} value={(spent + plannedSetAside) / income} />
         <View style={styles.balanceMeta}>
-          <Text style={styles.balanceMetaText}>{formatMoney(spent)} spent</Text>
+          <Text style={styles.balanceMetaText}>
+            {formatMoney(spent)} spent{plannedSetAside > 0 ? ` · ${formatMoney(plannedSetAside)} set aside` : ''}
+          </Text>
           <Text style={styles.balanceMetaText}>{formatMoney(income)} income</Text>
         </View>
       </View>
@@ -145,6 +157,41 @@ export function HomeScreen({
                 <View style={styles.allPaidCopy}>
                   <Text style={styles.allPaidTitle}>All bills are checked off</Text>
                   <Text style={styles.allPaidDetail}>Nice work—this month is covered.</Text>
+                </View>
+              </View>
+            )}
+          </View>
+        </>
+      ) : null}
+
+      {plannedExpenses.length ? (
+        <>
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>Planned expenses</Text>
+              <Text style={styles.sectionDetail}>{formatMoney(plannedSetAside)} to set aside this month</Text>
+            </View>
+            <Pressable onPress={onViewPlan}><Text style={styles.link}>Manage</Text></Pressable>
+          </View>
+          <View style={styles.billCard}>
+            {upcomingExpenses.length ? upcomingExpenses.map((expense, index) => (
+              <View key={expense.id}>
+                <PlannedExpenseRow
+                  categories={categories}
+                  compact
+                  expense={expense}
+                  onToggleCovered={() => onTogglePlannedExpenseCovered(expense)}
+                />
+                {index < upcomingExpenses.length - 1 ? <View style={styles.billDivider} /> : null}
+              </View>
+            )) : (
+              <View style={styles.allPaidRow}>
+                <View style={styles.allPaidIcon}>
+                  <MaterialCommunityIcons color={colors.primary} name="check-all" size={22} />
+                </View>
+                <View style={styles.allPaidCopy}>
+                  <Text style={styles.allPaidTitle}>Planned expenses are covered</Text>
+                  <Text style={styles.allPaidDetail}>Nothing else needs to be set aside right now.</Text>
                 </View>
               </View>
             )}

@@ -37,3 +37,20 @@ export const recurringBillDueDate = (dueDay: number) => {
 export const formatRecurringDueDate = (dueDay: number) => (
   recurringBillDueDate(dueDay).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 );
+
+export const formatTargetMonth = (targetMonth: string, long = false) => {
+  const [year, month] = targetMonth.split('-').map(Number);
+  if (!year || !month) return targetMonth;
+  return new Date(year, month - 1, 1).toLocaleDateString('en-US', {
+    month: long ? 'long' : 'short',
+    year: 'numeric',
+  });
+};
+
+export const plannedExpenseMonthlyAmount = (amount: number, targetMonth: string) => {
+  const now = new Date();
+  const [year, month] = targetMonth.split('-').map(Number);
+  if (!year || !month) return amount;
+  const monthsRemaining = Math.max(1, ((year - now.getFullYear()) * 12) + month - now.getMonth());
+  return amount / monthsRemaining;
+};

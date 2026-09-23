@@ -59,7 +59,7 @@ The app will cover the thread's requests through progressive disclosure: the def
 - Let users reorder and archive categories. Creating, renaming, and choosing colors/icons is now available.
 - Optional subcategories are now available for people who want granularity; broad categories remain the default.
 - Add reusable merchant rules so corrected transactions stay categorized the user's way.
-- Support planned one-time expenses alongside recurring bills.
+- Planned one-time expenses are now available alongside recurring bills, with a target month, optional category, suggested monthly set-aside, and covered state.
 - Add optional Needs, Wants, Giving, Saving/Investing, and Personal tags across any category.
 
 ### Then — one useful financial picture
@@ -118,3 +118,4 @@ Record decisions here with the date, decision, and reason. Move longer technical
 - 2026-09-20: Reddit user research is translated into a progressive roadmap rather than a crowded all-at-once interface. The default product remains a simple monthly overview, with subcategories, rules, reports, goals, net worth, and household sharing introduced contextually in phases.
 - 2026-09-21: Rename the product to Zenify and use the supplied shooting-star mark. Keep the existing hosting slug and native identifiers stable until a dedicated production migration is planned.
 - 2026-09-21: Keep budgets attached to broad categories while optional subcategories add transaction detail. This prevents double-counting and keeps the monthly plan easy to scan.
+- 2026-09-23: Planned one-time expenses use a month-level target and a calculated monthly set-aside. Uncovered set-asides reduce the displayed monthly buffer and available amount without creating a transaction or changing category spending.

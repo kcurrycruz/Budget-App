@@ -229,6 +229,57 @@ export type Database = {
           },
         ]
       }
+      planned_expenses: {
+        Row: {
+          amount: number
+          category_id: string | null
+          covered_at: string | null
+          created_at: string
+          id: string
+          name: string
+          target_month: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          category_id?: string | null
+          covered_at?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          target_month: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          amount?: number
+          category_id?: string | null
+          covered_at?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          target_month?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planned_expenses_category_owner_fkey"
+            columns: ["category_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "planned_expenses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plaid_items: {
         Row: {
           access_token_ciphertext: string

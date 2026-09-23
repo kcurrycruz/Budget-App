@@ -4,7 +4,7 @@ A phone-first finance app that unifies spending, budgeting, bills, and cash-flow
 
 ## Project status
 
-The authenticated budget foundation is working with private Supabase-backed data, editable monthly plans, manual transactions, exports, and account controls. The same Expo client now exports as an installable mobile web app while Plaid Sandbox integration is prepared. Product decisions, architecture notes, and milestones belong in [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md).
+The authenticated budget foundation is working with private Supabase-backed data, editable monthly plans, recurring bills, planned one-time expenses, manual transactions, exports, and account controls. The same Expo client exports as an installable mobile web app with Plaid Sandbox transaction syncing. Product decisions, architecture notes, and milestones belong in [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md).
 
 Live private beta: [kcurry-budget.expo.app](https://kcurry-budget.expo.app)
 
