@@ -1,7 +1,8 @@
 import { StatusBar } from 'expo-status-bar';
 import type { Session } from '@supabase/supabase-js';
-import { useCallback, useEffect, useState } from 'react';
-import { Alert, Platform, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import type { PropsWithChildren } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Animated, Easing, Platform, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
 import { AddTransactionModal } from './src/components/AddTransactionModal';
 import { BottomNav } from './src/components/BottomNav';
@@ -51,6 +52,50 @@ import { UpdatePasswordScreen } from './src/screens/UpdatePasswordScreen';
 import { colors } from './src/theme';
 import type { AppTab, Category, CategoryDraft, ManualTransactionDraft, MerchantRule, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalDraft, Subcategory, Transaction } from './src/types';
 import { formatActivityDate } from './src/utils/date';
+import { useReducedMotion } from './src/utils/useReducedMotion';
+
+const tabOrder: AppTab[] = ['home', 'transactions', 'plan', 'connect'];
+
+type TabTransitionProps = PropsWithChildren<{
+  direction: -1 | 1;
+}>;
+
+function TabTransition({ children, direction }: TabTransitionProps) {
+  const reduceMotion = useReducedMotion();
+  const opacity = useRef(new Animated.Value(0.78)).current;
+  const translateX = useRef(new Animated.Value(direction * 14)).current;
+
+  useEffect(() => {
+    if (reduceMotion) {
+      opacity.setValue(1);
+      translateX.setValue(0);
+      return undefined;
+    }
+
+    const animation = Animated.parallel([
+      Animated.timing(opacity, {
+        duration: 180,
+        easing: Easing.out(Easing.cubic),
+        toValue: 1,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(translateX, {
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        toValue: 0,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    ]);
+    animation.start();
+    return () => animation.stop();
+  }, [opacity, reduceMotion, translateX]);
+
+  return (
+    <Animated.View style={[styles.app, { opacity, transform: [{ translateX }] }]} testID="tab-transition">
+      {children}
+    </Animated.View>
+  );
+}
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -89,6 +134,7 @@ function BudgetApp({ session }: BudgetAppProps) {
   const cloudMode = Boolean(session);
   const forcePlanPreview = process.env.EXPO_PUBLIC_FORCE_PLAN_SETUP === 'true';
   const [activeTab, setActiveTab] = useState<AppTab>('home');
+  const [transitionDirection, setTransitionDirection] = useState<-1 | 1>(1);
   const [transactions, setTransactions] = useState<Transaction[]>(cloudMode ? [] : initialTransactions);
   const [categories, setCategories] = useState(cloudMode ? [] : initialCategories);
   const [connectedAccounts, setConnectedAccounts] = useState(cloudMode ? [] : accounts);
@@ -120,6 +166,12 @@ function BudgetApp({ session }: BudgetAppProps) {
   const [reviewTransaction, setReviewTransaction] = useState<Transaction | null>(null);
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reviewDeleting, setReviewDeleting] = useState(false);
+
+  const changeTab = useCallback((nextTab: AppTab) => {
+    if (nextTab === activeTab) return;
+    setTransitionDirection(tabOrder.indexOf(nextTab) > tabOrder.indexOf(activeTab) ? 1 : -1);
+    setActiveTab(nextTab);
+  }, [activeTab]);
 
   const refreshCloudData = useCallback(async () => {
     if (!session) return;
@@ -695,12 +747,12 @@ function BudgetApp({ session }: BudgetAppProps) {
             categories={categories}
             income={income}
             onAdd={openTransactionEntry}
-            onConnect={() => setActiveTab('connect')}
+            onConnect={() => changeTab('connect')}
             onOpenProfile={openProfile}
             onToggleBillPaid={(bill) => { void toggleRecurringBillPaid(bill); }}
             onTogglePlannedExpenseCovered={(expense) => { void togglePlannedExpenseCovered(expense); }}
-            onViewPlan={() => setActiveTab('plan')}
-            onViewTransactions={() => setActiveTab('transactions')}
+            onViewPlan={() => changeTab('plan')}
+            onViewTransactions={() => changeTab('transactions')}
             previewMode={!isCloudConfigured}
             plannedExpenses={plannedExpenses}
             transactions={transactions}
@@ -715,8 +767,8 @@ function BudgetApp({ session }: BudgetAppProps) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
-      <View style={styles.app}>{screen}</View>
-      <BottomNav activeTab={activeTab} onChange={setActiveTab} />
+      <TabTransition direction={transitionDirection} key={activeTab}>{screen}</TabTransition>
+      <BottomNav activeTab={activeTab} onChange={changeTab} />
       <AddTransactionModal
         categories={categories}
         initialTransaction={editingTransaction}
