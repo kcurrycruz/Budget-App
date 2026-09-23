@@ -89,6 +89,8 @@ const categoryNameFor = (primary?: string) => {
   return 'Other';
 };
 
+const merchantRuleKey = (merchant: string) => merchant.trim().toLowerCase().replace(/\s+/g, ' ');
+
 export async function syncPlaidItem(
   admin: SupabaseClient,
   item: PlaidItemRow,
@@ -157,13 +159,24 @@ export async function syncPlaidItem(
   if (categoryError) throw categoryError;
   const categoryIds = new Map((categoryRows ?? []).map((category) => [category.name as string, category.id as string]));
 
+  const { data: merchantRuleRows, error: merchantRuleError } = await admin
+    .from('merchant_rules')
+    .select('merchant_key, category_id, subcategory_id')
+    .eq('user_id', item.user_id)
+    .eq('active', true);
+  if (merchantRuleError) throw merchantRuleError;
+  const merchantRules = new Map((merchantRuleRows ?? []).map((rule) => [rule.merchant_key as string, {
+    categoryId: rule.category_id as string,
+    subcategoryId: rule.subcategory_id as string | null,
+  }]));
+
   const changed = [...added, ...modified];
-  const existing = new Map<string, { category_id: string | null; needs_review: boolean }>();
+  const existing = new Map<string, { category_id: string | null; needs_review: boolean; subcategory_id: string | null }>();
   for (const batch of chunks(changed.map((transaction) => transaction.transaction_id))) {
     if (batch.length === 0) continue;
     const { data, error } = await admin
       .from('transactions')
-      .select('plaid_transaction_id, category_id, needs_review')
+      .select('plaid_transaction_id, category_id, subcategory_id, needs_review')
       .eq('user_id', item.user_id)
       .in('plaid_transaction_id', batch);
     if (error) throw error;
@@ -171,6 +184,7 @@ export async function syncPlaidItem(
       existing.set(row.plaid_transaction_id as string, {
         category_id: row.category_id as string | null,
         needs_review: Boolean(row.needs_review),
+        subcategory_id: row.subcategory_id as string | null,
       });
     }
   }
@@ -180,18 +194,24 @@ export async function syncPlaidItem(
     const previous = existing.get(transaction.transaction_id);
     const primary = transaction.personal_finance_category?.primary;
     const direction = transaction.amount >= 0 ? 'outflow' : 'inflow';
+    const merchantName = (transaction.merchant_name ?? transaction.name ?? 'Unknown transaction').slice(0, 160);
+    const rule = direction === 'outflow' ? merchantRules.get(merchantRuleKey(merchantName)) : undefined;
+    const keepReviewedCategory = previous && !previous.needs_review;
     return {
       user_id: item.user_id,
       financial_account_id: accountIds.get(transaction.account_id) ?? null,
-      category_id: previous?.category_id ?? (direction === 'outflow' ? categoryIds.get(categoryNameFor(primary)) ?? null : null),
+      category_id: keepReviewedCategory
+        ? previous.category_id
+        : rule?.categoryId ?? previous?.category_id ?? (direction === 'outflow' ? categoryIds.get(categoryNameFor(primary)) ?? null : null),
+      subcategory_id: keepReviewedCategory ? previous.subcategory_id : rule?.subcategoryId ?? previous?.subcategory_id ?? null,
       plaid_transaction_id: transaction.transaction_id,
-      merchant_name: (transaction.merchant_name ?? transaction.name ?? 'Unknown transaction').slice(0, 160),
+      merchant_name: merchantName,
       amount: Math.abs(Number(transaction.amount)),
       direction,
       transaction_date: transaction.date,
       pending: transaction.pending,
       source: 'plaid',
-      needs_review: previous?.needs_review ?? true,
+      needs_review: keepReviewedCategory ? false : rule ? false : previous?.needs_review ?? true,
       plaid_category_primary: primary ?? null,
       plaid_category_detailed: transaction.personal_finance_category?.detailed ?? null,
       updated_at: now,

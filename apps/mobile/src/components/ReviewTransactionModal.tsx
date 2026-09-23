@@ -14,7 +14,7 @@ type ReviewTransactionModalProps = {
   onClose: () => void;
   onDelete: () => void;
   onEdit: () => void;
-  onSave: (categoryId: string, subcategoryId?: string) => void;
+  onSave: (categoryId: string, subcategoryId?: string, rememberMerchant?: boolean) => void;
 };
 
 export function ReviewTransactionModal({
@@ -29,10 +29,12 @@ export function ReviewTransactionModal({
 }: ReviewTransactionModalProps) {
   const [categoryId, setCategoryId] = useState('');
   const [subcategoryId, setSubcategoryId] = useState('');
+  const [rememberMerchant, setRememberMerchant] = useState(false);
 
   useEffect(() => {
     setCategoryId(transaction?.categoryId ?? '');
     setSubcategoryId(transaction?.subcategoryId ?? '');
+    setRememberMerchant(transaction?.source === 'plaid' && transaction.direction !== 'inflow');
   }, [transaction]);
 
   if (!transaction) return null;
@@ -119,10 +121,28 @@ export function ReviewTransactionModal({
           </View>
         </View> : null}
 
+        {!isInflow && !isManual ? (
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: rememberMerchant }}
+            disabled={busy}
+            onPress={() => setRememberMerchant((current) => !current)}
+            style={styles.rememberCard}
+          >
+            <View style={[styles.checkbox, rememberMerchant && styles.checkboxSelected]}>
+              {rememberMerchant ? <MaterialCommunityIcons color={colors.white} name="check" size={16} /> : null}
+            </View>
+            <View style={styles.rememberCopy}>
+              <Text style={styles.rememberTitle}>Use this for future transactions</Text>
+              <Text style={styles.rememberDetail}>Zenify will automatically categorize future charges from {transaction.merchant}.</Text>
+            </View>
+          </Pressable>
+        ) : null}
+
         {!isInflow ? (
           <Pressable
             disabled={!categoryId || busy}
-            onPress={() => onSave(categoryId, subcategoryId || undefined)}
+            onPress={() => onSave(categoryId, subcategoryId || undefined, rememberMerchant)}
             style={[styles.saveButton, (!categoryId || busy) && styles.saveButtonDisabled]}
           >
             <Text style={styles.saveButtonText}>{saving ? 'Saving…' : 'Save category'}</Text>
@@ -173,6 +193,12 @@ const styles = StyleSheet.create({
   subcategoryTextSelected: { color: colors.white },
   guidance: { alignItems: 'flex-start', backgroundColor: colors.primarySoft, borderRadius: radius.md, flexDirection: 'row', gap: spacing.md, padding: spacing.lg },
   guidanceText: { color: colors.primaryDark, flex: 1, fontSize: 12, lineHeight: 18 },
+  rememberCard: { alignItems: 'flex-start', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, flexDirection: 'row', gap: spacing.md, padding: spacing.lg },
+  checkbox: { alignItems: 'center', borderColor: colors.border, borderRadius: 6, borderWidth: 1.5, height: 22, justifyContent: 'center', marginTop: 1, width: 22 },
+  checkboxSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
+  rememberCopy: { flex: 1, gap: 3 },
+  rememberTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  rememberDetail: { color: colors.inkMuted, fontSize: 12, lineHeight: 17 },
   fieldGroup: { gap: spacing.md },
   fieldLabel: { color: colors.ink, fontSize: 14, fontWeight: '800' },
   categories: { gap: spacing.sm },

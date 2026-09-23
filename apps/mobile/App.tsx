@@ -320,11 +320,11 @@ function BudgetApp({ session }: BudgetAppProps) {
     );
   };
 
-  const saveTransactionCategory = async (categoryId: string, subcategoryId?: string) => {
+  const saveTransactionCategory = async (categoryId: string, subcategoryId?: string, rememberMerchant = false) => {
     if (!reviewTransaction) return;
     setReviewSaving(true);
     try {
-      if (session) await categorizeTransaction(reviewTransaction.id, categoryId, subcategoryId);
+      if (session) await categorizeTransaction(reviewTransaction.id, categoryId, subcategoryId, rememberMerchant);
 
       const previousCategoryId = reviewTransaction.categoryId;
       const affectsSpending = reviewTransaction.direction !== 'inflow';

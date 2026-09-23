@@ -171,6 +171,64 @@ export type Database = {
           },
         ]
       }
+      merchant_rules: {
+        Row: {
+          active: boolean
+          category_id: string
+          created_at: string
+          id: string
+          merchant_key: string
+          merchant_name: string
+          subcategory_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          category_id: string
+          created_at?: string
+          id?: string
+          merchant_key: string
+          merchant_name: string
+          subcategory_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          active?: boolean
+          category_id?: string
+          created_at?: string
+          id?: string
+          merchant_key?: string
+          merchant_name?: string
+          subcategory_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchant_rules_category_owner_fkey"
+            columns: ["category_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "merchant_rules_subcategory_owner_fkey"
+            columns: ["subcategory_id", "category_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id", "category_id", "user_id"]
+          },
+          {
+            foreignKeyName: "merchant_rules_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plaid_items: {
         Row: {
           access_token_ciphertext: string
@@ -560,6 +618,15 @@ export type Database = {
       authorize_plaid_webhook_retry: {
         Args: { p_secret: string }
         Returns: boolean
+      }
+      categorize_transaction: {
+        Args: {
+          p_category_id: string
+          p_remember_merchant?: boolean
+          p_subcategory_id?: string
+          p_transaction_id: string
+        }
+        Returns: undefined
       }
       claim_plaid_webhook_events: {
         Args: { p_batch_size?: number }

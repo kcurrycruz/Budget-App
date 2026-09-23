@@ -365,22 +365,20 @@ export async function deleteManualTransaction(transactionId: string) {
   if (!data?.id) throw new Error('The manual transaction could not be deleted.');
 }
 
-export async function categorizeTransaction(transactionId: string, categoryId: string, subcategoryId?: string) {
+export async function categorizeTransaction(
+  transactionId: string,
+  categoryId: string,
+  subcategoryId?: string,
+  rememberMerchant = false,
+) {
   const client = requireClient();
-  const { data, error } = await client
-    .from('transactions')
-    .update({
-      category_id: categoryId,
-      subcategory_id: subcategoryId || null,
-      needs_review: false,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', transactionId)
-    .select('id')
-    .single();
-
+  const { error } = await client.rpc('categorize_transaction', {
+    p_transaction_id: transactionId,
+    p_category_id: categoryId,
+    p_subcategory_id: subcategoryId || undefined,
+    p_remember_merchant: rememberMerchant,
+  });
   if (error) throw error;
-  if (!data?.id) throw new Error('The transaction could not be updated.');
 }
 
 export async function createCategory(draft: CategoryDraft, sortOrder: number) {
