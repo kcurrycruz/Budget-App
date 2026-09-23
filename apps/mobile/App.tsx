@@ -14,10 +14,12 @@ import {
   createManualTransaction,
   createRecurringBill,
   createSubcategory,
+  deleteMerchantRule,
   deleteManualTransaction,
   deleteRecurringBill,
   exportCloudBudget,
   loadCloudBudget,
+  loadMerchantRules,
   saveMonthlyPlan,
   setRecurringBillPaid,
   updateManualTransaction,
@@ -37,7 +39,7 @@ import { PlanSetupScreen } from './src/screens/PlanSetupScreen';
 import { TransactionsScreen } from './src/screens/TransactionsScreen';
 import { UpdatePasswordScreen } from './src/screens/UpdatePasswordScreen';
 import { colors } from './src/theme';
-import type { AppTab, Category, CategoryDraft, ManualTransactionDraft, RecurringBill, RecurringBillDraft, Subcategory, Transaction } from './src/types';
+import type { AppTab, Category, CategoryDraft, ManualTransactionDraft, MerchantRule, RecurringBill, RecurringBillDraft, Subcategory, Transaction } from './src/types';
 import { formatActivityDate } from './src/utils/date';
 
 export default function App() {
@@ -82,6 +84,7 @@ function BudgetApp({ session }: BudgetAppProps) {
   const [connectedAccounts, setConnectedAccounts] = useState(cloudMode ? [] : accounts);
   const [income, setIncome] = useState(cloudMode ? 0 : monthlyIncome);
   const [bills, setBills] = useState(cloudMode ? 0 : monthlyBills);
+  const [merchantRules, setMerchantRules] = useState<MerchantRule[]>([]);
   const [recurringBills, setRecurringBills] = useState<RecurringBill[]>(cloudMode ? [] : initialRecurringBills);
   const [dataLoading, setDataLoading] = useState(cloudMode);
   const [dataError, setDataError] = useState<string | null>(null);
@@ -109,6 +112,7 @@ function BudgetApp({ session }: BudgetAppProps) {
       setConnectedAccounts(data.accounts);
       setIncome(data.income);
       setBills(data.bills);
+      setMerchantRules(data.merchantRules);
       setRecurringBills(data.recurringBills);
     } catch (caught) {
       setDataError(caught instanceof Error ? caught.message : 'Your cloud budget could not be loaded.');
@@ -324,7 +328,14 @@ function BudgetApp({ session }: BudgetAppProps) {
     if (!reviewTransaction) return;
     setReviewSaving(true);
     try {
-      if (session) await categorizeTransaction(reviewTransaction.id, categoryId, subcategoryId, rememberMerchant);
+      if (session) {
+        await categorizeTransaction(reviewTransaction.id, categoryId, subcategoryId, rememberMerchant);
+        try {
+          setMerchantRules(await loadMerchantRules());
+        } catch {
+          // The category is saved even if the non-critical rule count refresh fails.
+        }
+      }
 
       const previousCategoryId = reviewTransaction.categoryId;
       const affectsSpending = reviewTransaction.direction !== 'inflow';
@@ -391,6 +402,12 @@ function BudgetApp({ session }: BudgetAppProps) {
       return;
     }
     setAccountOpen(true);
+    void loadMerchantRules().then(setMerchantRules).catch(() => undefined);
+  };
+
+  const removeMerchantRule = async (ruleId: string) => {
+    await deleteMerchantRule(ruleId);
+    setMerchantRules((current) => current.filter((rule) => rule.id !== ruleId));
   };
 
   const signOut = async () => {
@@ -443,10 +460,13 @@ function BudgetApp({ session }: BudgetAppProps) {
       <SafeAreaView style={styles.safeArea}>
         <AccountScreen
           accountCount={connectedAccounts.length}
+          categories={categories}
           email={email}
           fullName={String(session.user.user_metadata.full_name ?? '')}
+          merchantRules={merchantRules}
           onBack={() => setAccountOpen(false)}
           onDelete={deleteAccount}
+          onDeleteMerchantRule={removeMerchantRule}
           onExport={exportCloudBudget}
           onSignOut={signOut}
           transactionCount={transactions.length}

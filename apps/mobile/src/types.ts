@@ -46,6 +46,13 @@ export type ManualTransactionDraft = {
   transactionDate: string;
 };
 
+export type MerchantRule = {
+  id: string;
+  merchantName: string;
+  categoryId: string;
+  subcategoryId?: string;
+};
+
 export type RecurringBill = {
   id: string;
   name: string;

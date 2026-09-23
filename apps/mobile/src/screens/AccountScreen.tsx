@@ -13,14 +13,19 @@ import {
   View,
 } from 'react-native';
 
+import { MerchantRulesModal } from '../components/MerchantRulesModal';
 import { colors, radius, shadow, spacing } from '../theme';
+import type { Category, MerchantRule } from '../types';
 
 type AccountScreenProps = {
   accountCount: number;
+  categories: Category[];
   email: string;
   fullName: string;
+  merchantRules: MerchantRule[];
   onBack: () => void;
   onDelete: () => Promise<void>;
+  onDeleteMerchantRule: (ruleId: string) => Promise<void>;
   onExport: () => Promise<string>;
   onSignOut: () => Promise<void>;
   transactionCount: number;
@@ -28,10 +33,13 @@ type AccountScreenProps = {
 
 export function AccountScreen({
   accountCount,
+  categories,
   email,
   fullName,
+  merchantRules,
   onBack,
   onDelete,
+  onDeleteMerchantRule,
   onExport,
   onSignOut,
   transactionCount,
@@ -41,6 +49,7 @@ export function AccountScreen({
   const [deleteText, setDeleteText] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const initials = fullName
     ? fullName.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()
     : email.slice(0, 2).toUpperCase();
@@ -110,6 +119,15 @@ export function AccountScreen({
 
       <View style={styles.menuCard}>
         <MenuRow
+          detail={merchantRules.length === 0
+            ? 'Create rules while reviewing bank transactions.'
+            : `${merchantRules.length} saved ${merchantRules.length === 1 ? 'rule' : 'rules'} for future transactions.`}
+          icon="auto-fix"
+          label="Merchant rules"
+          onPress={() => setRulesOpen(true)}
+        />
+        <View style={styles.divider} />
+        <MenuRow
           detail="Share a readable JSON copy of your budget."
           icon="download-outline"
           label="Export my data"
@@ -136,6 +154,14 @@ export function AccountScreen({
       </View>
 
       <Text style={styles.privacyNote}>Your exported data is only shared after you choose a destination in your phone’s share menu.</Text>
+
+      <MerchantRulesModal
+        categories={categories}
+        onClose={() => setRulesOpen(false)}
+        onDelete={onDeleteMerchantRule}
+        rules={merchantRules}
+        visible={rulesOpen}
+      />
 
       <Modal animationType="slide" onRequestClose={closeDelete} presentationStyle="pageSheet" visible={deleteOpen}>
         <View style={styles.modalContent}>

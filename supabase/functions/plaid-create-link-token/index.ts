@@ -16,7 +16,7 @@ Deno.serve(async (request) => {
     const body = await request.json().catch(() => ({})) as Record<string, unknown>;
     const itemId = typeof body.itemId === 'string' ? body.itemId : null;
     const baseRequest = {
-      client_name: 'KC Budget',
+      client_name: 'Zenify',
       user: { client_user_id: user.id },
       country_codes: ['US'],
       language: 'en',
