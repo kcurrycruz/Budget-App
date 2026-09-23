@@ -1,7 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import type { Session } from '@supabase/supabase-js';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
 import { AddTransactionModal } from './src/components/AddTransactionModal';
 import { BottomNav } from './src/components/BottomNav';
@@ -552,7 +552,16 @@ function BudgetApp({ session }: BudgetAppProps) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { backgroundColor: colors.background, flex: 1 },
+  safeArea: {
+    backgroundColor: colors.background,
+    flex: 1,
+    ...(Platform.OS === 'web' ? {
+      paddingBottom: 0,
+      paddingLeft: 0,
+      paddingRight: 0,
+      paddingTop: 0,
+    } : {}),
+  },
   app: { backgroundColor: colors.background, flex: 1 },
   errorScreen: { alignItems: 'center', backgroundColor: colors.background, flex: 1, justifyContent: 'center', padding: 32 },
   errorTitle: { color: colors.ink, fontSize: 24, fontWeight: '800', textAlign: 'center' },
