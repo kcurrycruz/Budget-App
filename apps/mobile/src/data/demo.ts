@@ -16,7 +16,18 @@ export const initialPlannedExpenses: PlannedExpense[] = [
 ];
 
 export const initialSavingsGoals: SavingsGoal[] = [
-  { id: 'g1', name: 'Emergency fund', targetAmount: 10000, currentAmount: 6800, targetMonth: '2027-06-01' },
+  {
+    id: 'g1',
+    name: 'Emergency fund',
+    targetAmount: 10000,
+    startingAmount: 6200,
+    currentAmount: 6800,
+    targetMonth: '2027-06-01',
+    contributions: [
+      { id: 'gc2', savingsGoalId: 'g1', amount: 250, note: 'Payday transfer', contributedOn: '2026-09-20', createdAt: '2026-09-20T14:00:00Z' },
+      { id: 'gc1', savingsGoalId: 'g1', amount: 350, note: 'Monthly savings', contributedOn: '2026-09-05', createdAt: '2026-09-05T14:00:00Z' },
+    ],
+  },
 ];
 
 export const initialCategories: Category[] = [

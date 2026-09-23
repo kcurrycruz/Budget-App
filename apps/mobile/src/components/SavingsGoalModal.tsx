@@ -13,14 +13,17 @@ import {
 } from 'react-native';
 
 import { colors, radius, spacing } from '../theme';
-import type { SavingsGoal, SavingsGoalDraft } from '../types';
+import type { SavingsGoal, SavingsGoalContribution, SavingsGoalContributionDraft, SavingsGoalDraft } from '../types';
 import { formatTargetMonth, savingsGoalMonthlyAmount, toDateOnly } from '../utils/date';
 import { formatMoney, formatMoneyInput, parseMoneyInput } from '../utils/money';
 
 type SavingsGoalModalProps = {
+  contributionSaving: boolean;
   initialGoal?: SavingsGoal | null;
+  onAddContribution?: (draft: SavingsGoalContributionDraft) => Promise<boolean>;
   onClose: () => void;
   onDelete?: () => void;
+  onDeleteContribution?: (contribution: SavingsGoalContribution) => void;
   onSave: (draft: SavingsGoalDraft) => void;
   saving: boolean;
   visible: boolean;
@@ -31,11 +34,29 @@ const monthStart = (offset: number) => {
   return toDateOnly(new Date(now.getFullYear(), now.getMonth() + offset, 1));
 };
 
-export function SavingsGoalModal({ initialGoal, onClose, onDelete, onSave, saving, visible }: SavingsGoalModalProps) {
+const formatContributionDate = (date: string) => new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+}).format(new Date(`${date}T12:00:00`));
+
+export function SavingsGoalModal({
+  contributionSaving,
+  initialGoal,
+  onAddContribution,
+  onClose,
+  onDelete,
+  onDeleteContribution,
+  onSave,
+  saving,
+  visible,
+}: SavingsGoalModalProps) {
   const [name, setName] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
-  const [currentAmount, setCurrentAmount] = useState('');
+  const [startingAmount, setStartingAmount] = useState('');
   const [targetMonth, setTargetMonth] = useState(monthStart(12));
+  const [contributionAmount, setContributionAmount] = useState('');
+  const [contributionNote, setContributionNote] = useState('');
   const monthOptions = useMemo(() => {
     const options = Array.from({ length: 18 }, (_, index) => monthStart(index + 1));
     return initialGoal && !options.includes(initialGoal.targetMonth)
@@ -47,30 +68,49 @@ export function SavingsGoalModal({ initialGoal, onClose, onDelete, onSave, savin
     if (visible && initialGoal) {
       setName(initialGoal.name);
       setTargetAmount(formatMoneyInput(String(initialGoal.targetAmount)));
-      setCurrentAmount(formatMoneyInput(String(initialGoal.currentAmount)));
+      setStartingAmount(formatMoneyInput(String(initialGoal.startingAmount)));
       setTargetMonth(initialGoal.targetMonth);
     } else if (!visible) {
       setName('');
       setTargetAmount('');
-      setCurrentAmount('');
+      setStartingAmount('');
       setTargetMonth(monthStart(12));
+      setContributionAmount('');
+      setContributionNote('');
     }
   }, [initialGoal, visible]);
 
   const numericTarget = parseMoneyInput(targetAmount);
-  const numericCurrent = parseMoneyInput(currentAmount);
-  const canSave = !saving && name.trim().length > 0 && numericTarget > 0 && numericCurrent >= 0;
-  const monthlyAmount = savingsGoalMonthlyAmount(numericTarget, numericCurrent, targetMonth);
-  const complete = numericTarget > 0 && numericCurrent >= numericTarget;
+  const numericStarting = parseMoneyInput(startingAmount);
+  const existingContributions = initialGoal?.contributions.reduce((sum, contribution) => sum + contribution.amount, 0) ?? 0;
+  const displayedSaved = numericStarting + existingContributions;
+  const numericContribution = parseMoneyInput(contributionAmount);
+  const canSave = !saving && name.trim().length > 0 && numericTarget > 0 && numericStarting >= 0;
+  const canAddContribution = Boolean(onAddContribution) && !contributionSaving && numericContribution > 0;
+  const monthlyAmount = savingsGoalMonthlyAmount(numericTarget, displayedSaved, targetMonth);
+  const complete = numericTarget > 0 && displayedSaved >= numericTarget;
 
   const save = () => {
     if (!canSave) return;
     onSave({
       name: name.trim(),
       targetAmount: numericTarget,
-      currentAmount: numericCurrent,
+      startingAmount: numericStarting,
       targetMonth,
     });
+  };
+
+  const addContribution = async () => {
+    if (!canAddContribution || !onAddContribution) return;
+    const saved = await onAddContribution({
+      amount: numericContribution,
+      note: contributionNote.trim(),
+      contributedOn: toDateOnly(new Date()),
+    });
+    if (saved) {
+      setContributionAmount('');
+      setContributionNote('');
+    }
   };
 
   return (
@@ -116,17 +156,17 @@ export function SavingsGoalModal({ initialGoal, onClose, onDelete, onSave, savin
               </View>
             </View>
             <View style={styles.moneyField}>
-              <Text style={styles.fieldLabel}>Saved so far</Text>
+              <Text style={styles.fieldLabel}>Starting balance</Text>
               <View style={styles.moneyInputShell}>
                 <Text style={styles.currency}>$</Text>
                 <TextInput
-                  accessibilityLabel="Amount saved so far"
+                  accessibilityLabel="Starting savings balance"
                   keyboardType="decimal-pad"
-                  onChangeText={(value) => setCurrentAmount(formatMoneyInput(value))}
+                  onChangeText={(value) => setStartingAmount(formatMoneyInput(value))}
                   placeholder="0"
                   placeholderTextColor="#A7B0AA"
                   style={styles.moneyInput}
-                  value={currentAmount}
+                  value={startingAmount}
                 />
               </View>
             </View>
@@ -167,6 +207,89 @@ export function SavingsGoalModal({ initialGoal, onClose, onDelete, onSave, savin
             <Text style={styles.saveButtonText}>{saving ? 'Saving…' : initialGoal ? 'Save changes' : 'Create goal'}</Text>
           </Pressable>
 
+          {initialGoal && onAddContribution ? (
+            <View style={styles.contributionSection}>
+              <View style={styles.contributionHeading}>
+                <View>
+                  <Text style={styles.contributionTitle}>Contribution history</Text>
+                  <Text style={styles.contributionCaption}>{formatMoney(initialGoal.currentAmount)} saved in total</Text>
+                </View>
+                <View style={styles.contributionCount}>
+                  <Text style={styles.contributionCountText}>{initialGoal.contributions.length}</Text>
+                </View>
+              </View>
+
+              <View style={styles.contributionCard}>
+                <Text style={styles.fieldLabel}>Add money saved today</Text>
+                <View style={styles.moneyInputShell}>
+                  <Text style={styles.currency}>$</Text>
+                  <TextInput
+                    accessibilityLabel="Savings contribution amount"
+                    keyboardType="decimal-pad"
+                    onChangeText={(value) => setContributionAmount(formatMoneyInput(value))}
+                    placeholder="0"
+                    placeholderTextColor="#A7B0AA"
+                    style={styles.moneyInput}
+                    value={contributionAmount}
+                  />
+                </View>
+                <TextInput
+                  accessibilityLabel="Savings contribution note"
+                  maxLength={160}
+                  onChangeText={setContributionNote}
+                  placeholder="Optional note"
+                  placeholderTextColor={colors.inkMuted}
+                  style={styles.textInput}
+                  value={contributionNote}
+                />
+                <Pressable
+                  disabled={!canAddContribution}
+                  onPress={() => { void addContribution(); }}
+                  style={[styles.contributionButton, !canAddContribution && styles.saveButtonDisabled]}
+                >
+                  <MaterialCommunityIcons color={colors.white} name="plus" size={18} />
+                  <Text style={styles.contributionButtonText}>{contributionSaving ? 'Adding…' : 'Add contribution'}</Text>
+                </Pressable>
+              </View>
+
+              {initialGoal.contributions.length ? (
+                <View style={styles.historyList}>
+                  {initialGoal.contributions.slice(0, 6).map((contribution, index) => (
+                    <View key={contribution.id}>
+                      <View style={styles.historyRow}>
+                        <View style={styles.historyIcon}>
+                          <MaterialCommunityIcons color="#2F7A4D" name="arrow-up" size={18} />
+                        </View>
+                        <View style={styles.historyCopy}>
+                          <Text style={styles.historyAmount}>+{formatMoney(contribution.amount)}</Text>
+                          <Text numberOfLines={1} style={styles.historyDetail}>
+                            {contribution.note ? `${contribution.note} · ` : ''}{formatContributionDate(contribution.contributedOn)}
+                          </Text>
+                        </View>
+                        {onDeleteContribution ? (
+                          <Pressable
+                            accessibilityLabel={`Delete ${formatMoney(contribution.amount)} contribution`}
+                            disabled={contributionSaving}
+                            onPress={() => onDeleteContribution(contribution)}
+                            style={styles.historyDelete}
+                          >
+                            <MaterialCommunityIcons color={colors.inkMuted} name="trash-can-outline" size={18} />
+                          </Pressable>
+                        ) : null}
+                      </View>
+                      {index < Math.min(initialGoal.contributions.length, 6) - 1 ? <View style={styles.historyDivider} /> : null}
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.emptyHistory}>
+                  <MaterialCommunityIcons color={colors.primary} name="piggy-bank-outline" size={22} />
+                  <Text style={styles.emptyHistoryText}>Your deposits will appear here as you build this goal.</Text>
+                </View>
+              )}
+            </View>
+          ) : null}
+
           {initialGoal && onDelete ? (
             <Pressable disabled={saving} onPress={onDelete} style={styles.deleteButton}>
               <Text style={styles.deleteText}>Delete savings goal</Text>
@@ -206,4 +329,23 @@ const styles = StyleSheet.create({
   saveButtonText: { color: colors.white, fontSize: 16, fontWeight: '800' },
   deleteButton: { alignItems: 'center', padding: spacing.md },
   deleteText: { color: colors.danger, fontSize: 13, fontWeight: '800' },
+  contributionSection: { gap: spacing.lg },
+  contributionHeading: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  contributionTitle: { color: colors.ink, fontSize: 17, fontWeight: '800' },
+  contributionCaption: { color: colors.inkMuted, fontSize: 11, marginTop: 3 },
+  contributionCount: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.pill, height: 30, justifyContent: 'center', minWidth: 30, paddingHorizontal: spacing.sm },
+  contributionCountText: { color: colors.primaryDark, fontSize: 12, fontWeight: '800' },
+  contributionCard: { backgroundColor: colors.surfaceMuted, borderRadius: radius.md, gap: spacing.md, padding: spacing.lg },
+  contributionButton: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: radius.md, flexDirection: 'row', gap: spacing.sm, justifyContent: 'center', padding: spacing.md },
+  contributionButtonText: { color: colors.white, fontSize: 14, fontWeight: '800' },
+  historyList: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: spacing.lg },
+  historyRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, minHeight: 64, paddingVertical: spacing.md },
+  historyIcon: { alignItems: 'center', backgroundColor: '#E7F5EC', borderRadius: radius.pill, height: 34, justifyContent: 'center', width: 34 },
+  historyCopy: { flex: 1, gap: 2 },
+  historyAmount: { color: '#2F7A4D', fontSize: 14, fontWeight: '800' },
+  historyDetail: { color: colors.inkMuted, fontSize: 10 },
+  historyDelete: { alignItems: 'center', height: 38, justifyContent: 'center', width: 38 },
+  historyDivider: { backgroundColor: colors.border, height: StyleSheet.hairlineWidth, marginLeft: 46 },
+  emptyHistory: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderStyle: 'dashed', borderWidth: 1, flexDirection: 'row', gap: spacing.md, padding: spacing.lg },
+  emptyHistoryText: { color: colors.inkMuted, flex: 1, fontSize: 11, lineHeight: 16 },
 });

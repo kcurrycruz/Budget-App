@@ -19,12 +19,14 @@ import {
   createPlannedExpense,
   createRecurringBill,
   createSavingsGoal,
+  createSavingsGoalContribution,
   createSubcategory,
   deleteMerchantRule,
   deleteManualTransaction,
   deletePlannedExpense,
   deleteRecurringBill,
   deleteSavingsGoal,
+  deleteSavingsGoalContribution,
   exportCloudBudget,
   loadCloudBudget,
   loadMerchantRules,
@@ -50,8 +52,9 @@ import { PlanSetupScreen } from './src/screens/PlanSetupScreen';
 import { TransactionsScreen } from './src/screens/TransactionsScreen';
 import { UpdatePasswordScreen } from './src/screens/UpdatePasswordScreen';
 import { colors } from './src/theme';
-import type { AppTab, Category, CategoryDraft, ManualTransactionDraft, MerchantRule, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalDraft, Subcategory, Transaction } from './src/types';
+import type { AppTab, Category, CategoryDraft, ManualTransactionDraft, MerchantRule, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalContribution, SavingsGoalContributionDraft, SavingsGoalDraft, Subcategory, Transaction } from './src/types';
 import { formatActivityDate } from './src/utils/date';
+import { formatMoney } from './src/utils/money';
 import { useReducedMotion } from './src/utils/useReducedMotion';
 
 const tabOrder: AppTab[] = ['home', 'transactions', 'plan', 'connect'];
@@ -159,6 +162,7 @@ function BudgetApp({ session }: BudgetAppProps) {
   const [editingPlannedExpense, setEditingPlannedExpense] = useState<PlannedExpense | null>(null);
   const [savingsGoalOpen, setSavingsGoalOpen] = useState(false);
   const [savingsGoalSaving, setSavingsGoalSaving] = useState(false);
+  const [savingsContributionSaving, setSavingsContributionSaving] = useState(false);
   const [editingSavingsGoal, setEditingSavingsGoal] = useState<SavingsGoal | null>(null);
   const [cashFlowOpen, setCashFlowOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -494,14 +498,23 @@ function BudgetApp({ session }: BudgetAppProps) {
       if (editingSavingsGoal) {
         const saved = session
           ? await updateSavingsGoal(editingSavingsGoal.id, draft)
-          : { id: editingSavingsGoal.id, ...draft };
+          : {
+              ...editingSavingsGoal,
+              ...draft,
+              currentAmount: draft.startingAmount + editingSavingsGoal.contributions.reduce((sum, contribution) => sum + contribution.amount, 0),
+            };
         setSavingsGoals((current) => sortSavingsGoals(current.map((goal) => (
           goal.id === editingSavingsGoal.id ? saved : goal
         ))));
       } else {
         const saved = session
           ? await createSavingsGoal(draft)
-          : { id: `goal-${Date.now()}`, ...draft } satisfies SavingsGoal;
+          : {
+              id: `goal-${Date.now()}`,
+              ...draft,
+              currentAmount: draft.startingAmount,
+              contributions: [],
+            } satisfies SavingsGoal;
         setSavingsGoals((current) => sortSavingsGoals([...current, saved]));
       }
       setSavingsGoalOpen(false);
@@ -511,6 +524,68 @@ function BudgetApp({ session }: BudgetAppProps) {
     } finally {
       setSavingsGoalSaving(false);
     }
+  };
+
+  const saveSavingsGoalContribution = async (draft: SavingsGoalContributionDraft) => {
+    const goal = editingSavingsGoal;
+    if (!goal) return false;
+    setSavingsContributionSaving(true);
+    try {
+      const contribution = session
+        ? await createSavingsGoalContribution(goal.id, draft)
+        : {
+            id: `goal-contribution-${Date.now()}`,
+            savingsGoalId: goal.id,
+            amount: draft.amount,
+            note: draft.note || undefined,
+            contributedOn: draft.contributedOn,
+            createdAt: new Date().toISOString(),
+          } satisfies SavingsGoalContribution;
+      const updatedGoal: SavingsGoal = {
+        ...goal,
+        currentAmount: goal.currentAmount + contribution.amount,
+        contributions: [contribution, ...goal.contributions],
+      };
+      setSavingsGoals((current) => sortSavingsGoals(current.map((item) => item.id === goal.id ? updatedGoal : item)));
+      setEditingSavingsGoal(updatedGoal);
+      return true;
+    } catch (caught) {
+      Alert.alert('Could not add contribution', caught instanceof Error ? caught.message : 'Please try again.');
+      return false;
+    } finally {
+      setSavingsContributionSaving(false);
+    }
+  };
+
+  const performDeleteSavingsGoalContribution = async (contribution: SavingsGoalContribution) => {
+    const goal = editingSavingsGoal;
+    if (!goal) return;
+    setSavingsContributionSaving(true);
+    try {
+      if (session) await deleteSavingsGoalContribution(contribution.id);
+      const updatedGoal: SavingsGoal = {
+        ...goal,
+        currentAmount: Math.max(goal.startingAmount, goal.currentAmount - contribution.amount),
+        contributions: goal.contributions.filter((item) => item.id !== contribution.id),
+      };
+      setSavingsGoals((current) => sortSavingsGoals(current.map((item) => item.id === goal.id ? updatedGoal : item)));
+      setEditingSavingsGoal(updatedGoal);
+    } catch (caught) {
+      Alert.alert('Could not delete contribution', caught instanceof Error ? caught.message : 'Please try again.');
+    } finally {
+      setSavingsContributionSaving(false);
+    }
+  };
+
+  const confirmDeleteSavingsGoalContribution = (contribution: SavingsGoalContribution) => {
+    Alert.alert(
+      'Delete this contribution?',
+      `${formatMoney(contribution.amount)} will be removed from ${editingSavingsGoal?.name ?? 'this goal'}.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => { void performDeleteSavingsGoalContribution(contribution); } },
+      ],
+    );
   };
 
   const performDeleteSavingsGoal = async (goal: SavingsGoal) => {
@@ -532,7 +607,7 @@ function BudgetApp({ session }: BudgetAppProps) {
     if (!goal) return;
     Alert.alert(
       'Delete this savings goal?',
-      `${goal.name} and its saved progress will be permanently removed.`,
+      `${goal.name}, its saved progress, and its contribution history will be permanently removed.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Delete', style: 'destructive', onPress: () => { void performDeleteSavingsGoal(goal); } },
@@ -805,12 +880,15 @@ function BudgetApp({ session }: BudgetAppProps) {
         visible={plannedExpenseOpen}
       />
       <SavingsGoalModal
+        contributionSaving={savingsContributionSaving}
         initialGoal={editingSavingsGoal}
+        onAddContribution={editingSavingsGoal ? saveSavingsGoalContribution : undefined}
         onClose={() => {
           setSavingsGoalOpen(false);
           setEditingSavingsGoal(null);
         }}
         onDelete={editingSavingsGoal ? confirmDeleteSavingsGoal : undefined}
+        onDeleteContribution={editingSavingsGoal ? confirmDeleteSavingsGoalContribution : undefined}
         onSave={(draft) => { void saveSavingsGoal(draft); }}
         saving={savingsGoalSaving}
         visible={savingsGoalOpen}

@@ -78,15 +78,32 @@ export type SavingsGoal = {
   id: string;
   name: string;
   targetAmount: number;
+  startingAmount: number;
   currentAmount: number;
   targetMonth: string;
+  contributions: SavingsGoalContribution[];
 };
 
 export type SavingsGoalDraft = {
   name: string;
   targetAmount: number;
-  currentAmount: number;
+  startingAmount: number;
   targetMonth: string;
+};
+
+export type SavingsGoalContribution = {
+  id: string;
+  savingsGoalId: string;
+  amount: number;
+  note?: string;
+  contributedOn: string;
+  createdAt: string;
+};
+
+export type SavingsGoalContributionDraft = {
+  amount: number;
+  note: string;
+  contributedOn: string;
 };
 
 export type RecurringBill = {

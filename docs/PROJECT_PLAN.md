@@ -66,7 +66,7 @@ The app will cover the thread's requests through progressive disclosure: the def
 
 - A simple cash-flow report is now available inside Plan, combining expected and received income, actual spending, one-time set-asides, budget totals, and remaining availability.
 - Month-to-date spending now includes a comparison with the same point last month plus editable Needs, Wants, and Savings percentage views.
-- Savings goals are now available inside Plan with progress, target dates, and a suggested monthly pace. Add contribution history, sinking-fund automation, and net-worth tracking without putting them on the primary Home screen.
+- Savings goals now include dated contribution history inside Plan, alongside progress, target dates, and a suggested monthly pace. Add sinking-fund automation and net-worth tracking without putting them on the primary Home screen.
 - Add spreadsheet/CSV import and export so users retain control of their data.
 
 ### Later — households and power tools
@@ -125,3 +125,4 @@ Record decisions here with the date, decision, and reason. Move longer technical
 - 2026-09-23: Savings goals stay inside Plan and track a target, current saved balance, and target month. The remaining balance creates a monthly goal pace that participates in the plan buffer, while edits remain manual until transaction-linked contributions are introduced.
 - 2026-09-23: Home greets each person by the first name on their account, derives the avatar initials from that name, and shows the current month as a compact overview label instead of a generic “Your September” title.
 - 2026-09-23: Primary tab changes use a short directional fade-and-slide plus a small selected-icon lift. The motion remains subtle, preserves the stable four-tab layout, and respects the device’s Reduce Motion preference.
+- 2026-09-23: Savings-goal deposits are stored as private dated contribution records. The original saved amount remains a starting balance, contribution totals are calculated on read, and deleting a contribution reverses only that entry without rewriting the goal’s history.

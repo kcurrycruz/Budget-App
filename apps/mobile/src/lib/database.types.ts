@@ -524,6 +524,51 @@ export type Database = {
           },
         ]
       }
+      savings_goal_contributions: {
+        Row: {
+          amount: number
+          contributed_on: string
+          created_at: string
+          id: string
+          note: string | null
+          savings_goal_id: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          contributed_on?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          savings_goal_id: string
+          user_id?: string
+        }
+        Update: {
+          amount?: number
+          contributed_on?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          savings_goal_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "savings_goal_contributions_goal_owner_fkey"
+            columns: ["savings_goal_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "savings_goals"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "savings_goal_contributions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       savings_goals: {
         Row: {
           created_at: string
