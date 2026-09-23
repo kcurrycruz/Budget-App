@@ -66,7 +66,7 @@ The app will cover the thread's requests through progressive disclosure: the def
 
 - A simple cash-flow report is now available inside Plan, combining expected and received income, actual spending, one-time set-asides, budget totals, and remaining availability.
 - Month-to-date spending now includes a comparison with the same point last month plus editable Needs, Wants, and Savings percentage views.
-- Add savings goals, sinking funds, and net-worth tracking without putting them on the primary Home screen.
+- Savings goals are now available inside Plan with progress, target dates, and a suggested monthly pace. Add contribution history, sinking-fund automation, and net-worth tracking without putting them on the primary Home screen.
 - Add spreadsheet/CSV import and export so users retain control of their data.
 
 ### Later — households and power tools
@@ -122,3 +122,4 @@ Record decisions here with the date, decision, and reason. Move longer technical
 - 2026-09-23: The first cash-flow report stays inside Plan to preserve the four-tab navigation. It separates actual transactions from budget targets and explains that planned set-asides do not create transactions.
 - 2026-09-23: Month-to-month spending compares the current month through today's date with the same period last month so partial months are not measured against completed months.
 - 2026-09-23: Needs, Wants, and Savings are stored as an editable group on each category. Percentages use categorized spending only, keeping the report transparent when uncategorized transactions still need review.
+- 2026-09-23: Savings goals stay inside Plan and track a target, current saved balance, and target month. The remaining balance creates a monthly goal pace that participates in the plan buffer, while edits remain manual until transaction-linked contributions are introduced.

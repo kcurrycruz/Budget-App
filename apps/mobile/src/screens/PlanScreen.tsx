@@ -4,10 +4,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ProgressBar } from '../components/ProgressBar';
 import { PlannedExpenseRow } from '../components/PlannedExpenseRow';
 import { RecurringBillRow } from '../components/RecurringBillRow';
+import { SavingsGoalRow } from '../components/SavingsGoalRow';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { colors, radius, spacing } from '../theme';
-import type { Category, PlannedExpense, RecurringBill } from '../types';
-import { plannedExpenseMonthlyAmount } from '../utils/date';
+import type { Category, PlannedExpense, RecurringBill, SavingsGoal } from '../types';
+import { plannedExpenseMonthlyAmount, savingsGoalMonthlyAmount } from '../utils/date';
 import { formatMoney } from '../utils/money';
 
 type PlanScreenProps = {
@@ -16,11 +17,14 @@ type PlanScreenProps = {
   bills: number;
   plannedExpenses: PlannedExpense[];
   recurringBills: RecurringBill[];
+  savingsGoals: SavingsGoal[];
   onAddBill: () => void;
   onAddPlannedExpense: () => void;
+  onAddSavingsGoal: () => void;
   onEdit: () => void;
   onEditBill: (bill: RecurringBill) => void;
   onEditPlannedExpense: (expense: PlannedExpense) => void;
+  onEditSavingsGoal: (goal: SavingsGoal) => void;
   onManageCategories: () => void;
   onOpenCashFlow: () => void;
   onToggleBillPaid: (bill: RecurringBill) => void;
@@ -33,11 +37,14 @@ export function PlanScreen({
   bills,
   plannedExpenses,
   recurringBills,
+  savingsGoals,
   onAddBill,
   onAddPlannedExpense,
+  onAddSavingsGoal,
   onEdit,
   onEditBill,
   onEditPlannedExpense,
+  onEditSavingsGoal,
   onManageCategories,
   onOpenCashFlow,
   onToggleBillPaid,
@@ -47,7 +54,12 @@ export function PlanScreen({
   const plannedSetAside = plannedExpenses
     .filter((expense) => !expense.covered)
     .reduce((sum, expense) => sum + plannedExpenseMonthlyAmount(expense.amount, expense.targetMonth), 0);
-  const planned = bills + flexibleBudget + plannedSetAside;
+  const goalSetAside = savingsGoals.reduce((sum, goal) => (
+    sum + savingsGoalMonthlyAmount(goal.targetAmount, goal.currentAmount, goal.targetMonth)
+  ), 0);
+  const totalGoalSaved = savingsGoals.reduce((sum, goal) => sum + goal.currentAmount, 0);
+  const totalGoalTarget = savingsGoals.reduce((sum, goal) => sum + goal.targetAmount, 0);
+  const planned = bills + flexibleBudget + plannedSetAside + goalSetAside;
   const buffer = income - planned;
   const plannedRatio = income > 0 ? Math.min(planned / income, 1) : 0;
   const recurringTotal = recurringBills.reduce((sum, bill) => sum + bill.amount, 0);
@@ -177,6 +189,41 @@ export function PlanScreen({
           <View style={styles.emptyBillCopy}>
             <Text style={styles.emptyBillTitle}>Plan a one-time expense</Text>
             <Text style={styles.emptyBillDetail}>Add a trip, repair, or purchase and see a simple monthly set-aside.</Text>
+          </View>
+        </Pressable>
+      )}
+
+      <View style={styles.sectionTitleRow}>
+        <View>
+          <Text style={styles.sectionTitle}>Savings goals</Text>
+          <Text style={styles.sectionCaption}>
+            {savingsGoals.length
+              ? `${formatMoney(totalGoalSaved)} saved of ${formatMoney(totalGoalTarget)} · ${formatMoney(goalSetAside)}/month pace`
+              : 'Turn long-term plans into a monthly pace'}
+          </Text>
+        </View>
+        <Pressable accessibilityLabel="Add savings goal" onPress={onAddSavingsGoal} style={styles.addBillButton}>
+          <MaterialCommunityIcons color={colors.primaryDark} name="plus" size={18} />
+          <Text style={styles.addBillText}>Add</Text>
+        </Pressable>
+      </View>
+      {savingsGoals.length ? (
+        <View style={styles.billList}>
+          {savingsGoals.map((goal, index) => (
+            <View key={goal.id}>
+              <SavingsGoalRow goal={goal} onEdit={() => onEditSavingsGoal(goal)} />
+              {index < savingsGoals.length - 1 ? <View style={styles.billDivider} /> : null}
+            </View>
+          ))}
+        </View>
+      ) : (
+        <Pressable onPress={onAddSavingsGoal} style={styles.emptyBills}>
+          <View style={styles.emptyBillIcon}>
+            <MaterialCommunityIcons color={colors.primary} name="piggy-bank-outline" size={24} />
+          </View>
+          <View style={styles.emptyBillCopy}>
+            <Text style={styles.emptyBillTitle}>Create your first savings goal</Text>
+            <Text style={styles.emptyBillDetail}>Set a target and Zenify will show a simple monthly pace.</Text>
           </View>
         </Pressable>
       )}

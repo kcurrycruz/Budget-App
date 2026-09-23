@@ -74,6 +74,21 @@ export type PlannedExpenseDraft = {
   categoryId?: string;
 };
 
+export type SavingsGoal = {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  targetMonth: string;
+};
+
+export type SavingsGoalDraft = {
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  targetMonth: string;
+};
+
 export type RecurringBill = {
   id: string;
   name: string;

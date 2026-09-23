@@ -1,7 +1,7 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
 
 import { supabase } from '../lib/supabase';
-import type { Account, Category, CategoryDraft, ManualTransactionDraft, MerchantRule, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SpendingGroup, Transaction } from '../types';
+import type { Account, Category, CategoryDraft, ManualTransactionDraft, MerchantRule, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalDraft, SpendingGroup, Transaction } from '../types';
 import { formatActivityDate, toDateOnly } from '../utils/date';
 
 export type CloudBudgetData = {
@@ -13,6 +13,7 @@ export type CloudBudgetData = {
   plannedExpenses: PlannedExpense[];
   previousMonthToDateSpent: number;
   recurringBills: RecurringBill[];
+  savingsGoals: SavingsGoal[];
   transactions: Transaction[];
 };
 
@@ -87,6 +88,14 @@ type PlannedExpenseRow = {
   covered_at: string | null;
 };
 
+type SavingsGoalRow = {
+  id: string;
+  name: string;
+  target_amount: number | string;
+  current_amount: number | string;
+  target_month: string;
+};
+
 const mapMerchantRule = (rule: MerchantRuleRow): MerchantRule => ({
   id: rule.id,
   merchantName: rule.merchant_name,
@@ -102,6 +111,14 @@ const mapPlannedExpense = (expense: PlannedExpenseRow): PlannedExpense => ({
   categoryId: expense.category_id ?? undefined,
   covered: Boolean(expense.covered_at),
   coveredAt: expense.covered_at ?? undefined,
+});
+
+const mapSavingsGoal = (goal: SavingsGoalRow): SavingsGoal => ({
+  id: goal.id,
+  name: goal.name,
+  targetAmount: Number(goal.target_amount),
+  currentAmount: Number(goal.current_amount),
+  targetMonth: goal.target_month,
 });
 
 const getMonthBounds = () => {
@@ -149,7 +166,7 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
   const client = requireClient();
   const { start, end, previousStart, previousEnd } = getMonthBounds();
 
-  const [monthResult, categoriesResult, subcategoriesResult, accountsResult, transactionsResult, previousTransactionsResult, billsResult, billPaymentsResult, merchantRulesResult, plannedExpensesResult] = await Promise.all([
+  const [monthResult, categoriesResult, subcategoriesResult, accountsResult, transactionsResult, previousTransactionsResult, billsResult, billPaymentsResult, merchantRulesResult, plannedExpensesResult, savingsGoalsResult] = await Promise.all([
     client.from('budget_months').select('expected_income, fixed_costs').eq('month', start).maybeSingle(),
     client.from('categories').select('id, name, color, icon, monthly_limit, spending_group').is('archived_at', null).order('sort_order'),
     client.from('subcategories').select('id, category_id, name').is('archived_at', null).order('sort_order').order('name'),
@@ -160,10 +177,11 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
     client.from('recurring_bill_payments').select('recurring_bill_id, paid_at').eq('month', start),
     client.from('merchant_rules').select('id, merchant_name, category_id, subcategory_id').eq('active', true).order('merchant_name'),
     client.from('planned_expenses').select('id, name, amount, target_month, category_id, covered_at').order('target_month').order('name'),
+    client.from('savings_goals').select('id, name, target_amount, current_amount, target_month').order('target_month').order('name'),
   ]);
 
   const error = monthResult.error ?? categoriesResult.error ?? subcategoriesResult.error ?? accountsResult.error ?? transactionsResult.error ?? previousTransactionsResult.error
-    ?? billsResult.error ?? billPaymentsResult.error ?? merchantRulesResult.error ?? plannedExpensesResult.error;
+    ?? billsResult.error ?? billPaymentsResult.error ?? merchantRulesResult.error ?? plannedExpensesResult.error ?? savingsGoalsResult.error;
   if (error) throw error;
 
   const categoryRows = (categoriesResult.data ?? []) as CategoryRow[];
@@ -175,6 +193,7 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
   const paymentRows = (billPaymentsResult.data ?? []) as RecurringBillPaymentRow[];
   const merchantRuleRows = (merchantRulesResult.data ?? []) as MerchantRuleRow[];
   const plannedExpenseRows = (plannedExpensesResult.data ?? []) as PlannedExpenseRow[];
+  const savingsGoalRows = (savingsGoalsResult.data ?? []) as SavingsGoalRow[];
   const billPayments = new Map(paymentRows.map((payment) => [payment.recurring_bill_id, payment.paid_at]));
   const accountNames = new Map(accountRows.map((account) => [account.id, account.display_name]));
   const spending = new Map<string, number>();
@@ -256,6 +275,7 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
     plannedExpenses: plannedExpenseRows.map(mapPlannedExpense),
     previousMonthToDateSpent,
     recurringBills,
+    savingsGoals: savingsGoalRows.map(mapSavingsGoal),
     transactions,
   };
 }
@@ -329,6 +349,47 @@ export async function deletePlannedExpense(expenseId: string) {
   const { data, error } = await client.from('planned_expenses').delete().eq('id', expenseId).select('id').single();
   if (error) throw error;
   if (!data?.id) throw new Error('The planned expense could not be deleted.');
+}
+
+export async function createSavingsGoal(draft: SavingsGoalDraft) {
+  const client = requireClient();
+  const { data, error } = await client
+    .from('savings_goals')
+    .insert({
+      name: draft.name,
+      target_amount: draft.targetAmount,
+      current_amount: draft.currentAmount,
+      target_month: draft.targetMonth,
+    })
+    .select('id, name, target_amount, current_amount, target_month')
+    .single();
+  if (error) throw error;
+  return mapSavingsGoal(data as SavingsGoalRow);
+}
+
+export async function updateSavingsGoal(goalId: string, draft: SavingsGoalDraft) {
+  const client = requireClient();
+  const { data, error } = await client
+    .from('savings_goals')
+    .update({
+      name: draft.name,
+      target_amount: draft.targetAmount,
+      current_amount: draft.currentAmount,
+      target_month: draft.targetMonth,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', goalId)
+    .select('id, name, target_amount, current_amount, target_month')
+    .single();
+  if (error) throw error;
+  return mapSavingsGoal(data as SavingsGoalRow);
+}
+
+export async function deleteSavingsGoal(goalId: string) {
+  const client = requireClient();
+  const { data, error } = await client.from('savings_goals').delete().eq('id', goalId).select('id').single();
+  if (error) throw error;
+  if (!data?.id) throw new Error('The savings goal could not be deleted.');
 }
 
 export async function createRecurringBill(draft: RecurringBillDraft) {
@@ -585,7 +646,7 @@ export async function saveMonthlyPlan(input: {
 
 export async function exportCloudBudget() {
   const client = requireClient();
-  const [profileResult, monthsResult, categoriesResult, subcategoriesResult, accountsResult, transactionsResult, recurringBillsResult, recurringBillPaymentsResult, merchantRulesResult, plannedExpensesResult] = await Promise.all([
+  const [profileResult, monthsResult, categoriesResult, subcategoriesResult, accountsResult, transactionsResult, recurringBillsResult, recurringBillPaymentsResult, merchantRulesResult, plannedExpensesResult, savingsGoalsResult] = await Promise.all([
     client.from('profiles').select('full_name, created_at, updated_at').single(),
     client.from('budget_months').select('month, expected_income, fixed_costs, created_at, updated_at').order('month'),
     client.from('categories').select('name, color, icon, monthly_limit, spending_group, sort_order, archived_at, created_at, updated_at').order('sort_order'),
@@ -596,11 +657,12 @@ export async function exportCloudBudget() {
     client.from('recurring_bill_payments').select('recurring_bill_id, month, paid_at, created_at').order('month', { ascending: false }),
     client.from('merchant_rules').select('merchant_name, category_id, subcategory_id, active, created_at, updated_at').order('merchant_name'),
     client.from('planned_expenses').select('name, amount, target_month, category_id, covered_at, created_at, updated_at').order('target_month'),
+    client.from('savings_goals').select('name, target_amount, current_amount, target_month, created_at, updated_at').order('target_month'),
   ]);
 
   const error = profileResult.error ?? monthsResult.error ?? categoriesResult.error ?? subcategoriesResult.error ?? accountsResult.error
     ?? transactionsResult.error ?? recurringBillsResult.error ?? recurringBillPaymentsResult.error ?? merchantRulesResult.error
-    ?? plannedExpensesResult.error;
+    ?? plannedExpensesResult.error ?? savingsGoalsResult.error;
   if (error) throw error;
 
   return JSON.stringify({
@@ -612,6 +674,7 @@ export async function exportCloudBudget() {
     financial_accounts: accountsResult.data,
     merchant_rules: merchantRulesResult.data,
     planned_expenses: plannedExpensesResult.data,
+    savings_goals: savingsGoalsResult.data,
     transactions: transactionsResult.data,
     recurring_bills: recurringBillsResult.data,
     recurring_bill_payments: recurringBillPaymentsResult.data,

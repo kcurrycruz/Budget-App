@@ -10,17 +10,20 @@ import { CategoryManagerModal } from './src/components/CategoryManagerModal';
 import { PlannedExpenseModal } from './src/components/PlannedExpenseModal';
 import { RecurringBillModal } from './src/components/RecurringBillModal';
 import { ReviewTransactionModal } from './src/components/ReviewTransactionModal';
+import { SavingsGoalModal } from './src/components/SavingsGoalModal';
 import {
   categorizeTransaction,
   createCategory as createBudgetCategory,
   createManualTransaction,
   createPlannedExpense,
   createRecurringBill,
+  createSavingsGoal,
   createSubcategory,
   deleteMerchantRule,
   deleteManualTransaction,
   deletePlannedExpense,
   deleteRecurringBill,
+  deleteSavingsGoal,
   exportCloudBudget,
   loadCloudBudget,
   loadMerchantRules,
@@ -31,9 +34,10 @@ import {
   updatePlannedExpense,
   updateCategory as updateBudgetCategory,
   updateRecurringBill,
+  updateSavingsGoal,
   updateSubcategory,
 } from './src/data/budgetRepository';
-import { accounts, initialCategories, initialPlannedExpenses, initialRecurringBills, initialTransactions, monthlyBills, monthlyIncome, previousMonthToDateSpent as demoPreviousMonthToDateSpent } from './src/data/demo';
+import { accounts, initialCategories, initialPlannedExpenses, initialRecurringBills, initialSavingsGoals, initialTransactions, monthlyBills, monthlyIncome, previousMonthToDateSpent as demoPreviousMonthToDateSpent } from './src/data/demo';
 import { isCloudConfigured, supabase } from './src/lib/supabase';
 import { AccountScreen } from './src/screens/AccountScreen';
 import { AuthScreen } from './src/screens/AuthScreen';
@@ -45,7 +49,7 @@ import { PlanSetupScreen } from './src/screens/PlanSetupScreen';
 import { TransactionsScreen } from './src/screens/TransactionsScreen';
 import { UpdatePasswordScreen } from './src/screens/UpdatePasswordScreen';
 import { colors } from './src/theme';
-import type { AppTab, Category, CategoryDraft, ManualTransactionDraft, MerchantRule, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, Subcategory, Transaction } from './src/types';
+import type { AppTab, Category, CategoryDraft, ManualTransactionDraft, MerchantRule, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalDraft, Subcategory, Transaction } from './src/types';
 import { formatActivityDate } from './src/utils/date';
 
 export default function App() {
@@ -94,6 +98,7 @@ function BudgetApp({ session }: BudgetAppProps) {
   const [merchantRules, setMerchantRules] = useState<MerchantRule[]>([]);
   const [plannedExpenses, setPlannedExpenses] = useState<PlannedExpense[]>(cloudMode ? [] : initialPlannedExpenses);
   const [recurringBills, setRecurringBills] = useState<RecurringBill[]>(cloudMode ? [] : initialRecurringBills);
+  const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>(cloudMode ? [] : initialSavingsGoals);
   const [dataLoading, setDataLoading] = useState(cloudMode);
   const [dataError, setDataError] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -106,6 +111,9 @@ function BudgetApp({ session }: BudgetAppProps) {
   const [plannedExpenseOpen, setPlannedExpenseOpen] = useState(false);
   const [plannedExpenseSaving, setPlannedExpenseSaving] = useState(false);
   const [editingPlannedExpense, setEditingPlannedExpense] = useState<PlannedExpense | null>(null);
+  const [savingsGoalOpen, setSavingsGoalOpen] = useState(false);
+  const [savingsGoalSaving, setSavingsGoalSaving] = useState(false);
+  const [editingSavingsGoal, setEditingSavingsGoal] = useState<SavingsGoal | null>(null);
   const [cashFlowOpen, setCashFlowOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
@@ -128,6 +136,7 @@ function BudgetApp({ session }: BudgetAppProps) {
       setMerchantRules(data.merchantRules);
       setPlannedExpenses(data.plannedExpenses);
       setRecurringBills(data.recurringBills);
+      setSavingsGoals(data.savingsGoals);
     } catch (caught) {
       setDataError(caught instanceof Error ? caught.message : 'Your cloud budget could not be loaded.');
     } finally {
@@ -416,6 +425,69 @@ function BudgetApp({ session }: BudgetAppProps) {
     );
   };
 
+  const sortSavingsGoals = (items: SavingsGoal[]) => [...items].sort((left, right) => (
+    Number(left.currentAmount >= left.targetAmount) - Number(right.currentAmount >= right.targetAmount)
+    || left.targetMonth.localeCompare(right.targetMonth)
+    || left.name.localeCompare(right.name)
+  ));
+
+  const openSavingsGoal = (goal?: SavingsGoal) => {
+    setEditingSavingsGoal(goal ?? null);
+    setSavingsGoalOpen(true);
+  };
+
+  const saveSavingsGoal = async (draft: SavingsGoalDraft) => {
+    setSavingsGoalSaving(true);
+    try {
+      if (editingSavingsGoal) {
+        const saved = session
+          ? await updateSavingsGoal(editingSavingsGoal.id, draft)
+          : { id: editingSavingsGoal.id, ...draft };
+        setSavingsGoals((current) => sortSavingsGoals(current.map((goal) => (
+          goal.id === editingSavingsGoal.id ? saved : goal
+        ))));
+      } else {
+        const saved = session
+          ? await createSavingsGoal(draft)
+          : { id: `goal-${Date.now()}`, ...draft } satisfies SavingsGoal;
+        setSavingsGoals((current) => sortSavingsGoals([...current, saved]));
+      }
+      setSavingsGoalOpen(false);
+      setEditingSavingsGoal(null);
+    } catch (caught) {
+      Alert.alert('Could not save savings goal', caught instanceof Error ? caught.message : 'Please try again.');
+    } finally {
+      setSavingsGoalSaving(false);
+    }
+  };
+
+  const performDeleteSavingsGoal = async (goal: SavingsGoal) => {
+    setSavingsGoalSaving(true);
+    try {
+      if (session) await deleteSavingsGoal(goal.id);
+      setSavingsGoals((current) => current.filter((item) => item.id !== goal.id));
+      setSavingsGoalOpen(false);
+      setEditingSavingsGoal(null);
+    } catch (caught) {
+      Alert.alert('Could not delete savings goal', caught instanceof Error ? caught.message : 'Please try again.');
+    } finally {
+      setSavingsGoalSaving(false);
+    }
+  };
+
+  const confirmDeleteSavingsGoal = () => {
+    const goal = editingSavingsGoal;
+    if (!goal) return;
+    Alert.alert(
+      'Delete this savings goal?',
+      `${goal.name} and its saved progress will be permanently removed.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => { void performDeleteSavingsGoal(goal); } },
+      ],
+    );
+  };
+
   const saveTransactionCategory = async (categoryId: string, subcategoryId?: string, rememberMerchant = false) => {
     if (!reviewTransaction) return;
     setReviewSaving(true);
@@ -586,15 +658,18 @@ function BudgetApp({ session }: BudgetAppProps) {
             income={income}
             onAddBill={() => openRecurringBill()}
             onAddPlannedExpense={() => openPlannedExpense()}
+            onAddSavingsGoal={() => openSavingsGoal()}
             onEdit={() => setPlanEditing(true)}
             onEditBill={openRecurringBill}
             onEditPlannedExpense={openPlannedExpense}
+            onEditSavingsGoal={openSavingsGoal}
             onManageCategories={() => setCategoryManagerOpen(true)}
             onOpenCashFlow={() => setCashFlowOpen(true)}
             onToggleBillPaid={(bill) => { void toggleRecurringBillPaid(bill); }}
             onTogglePlannedExpenseCovered={(expense) => { void togglePlannedExpenseCovered(expense); }}
             plannedExpenses={plannedExpenses}
             recurringBills={recurringBills}
+            savingsGoals={savingsGoals}
           />
         );
       case 'connect':
@@ -661,6 +736,17 @@ function BudgetApp({ session }: BudgetAppProps) {
         saving={plannedExpenseSaving}
         visible={plannedExpenseOpen}
       />
+      <SavingsGoalModal
+        initialGoal={editingSavingsGoal}
+        onClose={() => {
+          setSavingsGoalOpen(false);
+          setEditingSavingsGoal(null);
+        }}
+        onDelete={editingSavingsGoal ? confirmDeleteSavingsGoal : undefined}
+        onSave={(draft) => { void saveSavingsGoal(draft); }}
+        saving={savingsGoalSaving}
+        visible={savingsGoalOpen}
+      />
       <CashFlowReportModal
         bills={bills}
         categories={categories}
@@ -668,6 +754,7 @@ function BudgetApp({ session }: BudgetAppProps) {
         onClose={() => setCashFlowOpen(false)}
         plannedExpenses={plannedExpenses}
         previousMonthToDateSpent={previousMonthToDateSpent}
+        savingsGoals={savingsGoals}
         transactions={transactions}
         visible={cashFlowOpen}
       />

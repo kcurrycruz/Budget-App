@@ -54,3 +54,7 @@ export const plannedExpenseMonthlyAmount = (amount: number, targetMonth: string)
   const monthsRemaining = Math.max(1, ((year - now.getFullYear()) * 12) + month - now.getMonth());
   return amount / monthsRemaining;
 };
+
+export const savingsGoalMonthlyAmount = (targetAmount: number, currentAmount: number, targetMonth: string) => (
+  plannedExpenseMonthlyAmount(Math.max(targetAmount - currentAmount, 0), targetMonth)
+);

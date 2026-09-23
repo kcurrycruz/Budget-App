@@ -2,8 +2,8 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, spacing } from '../theme';
-import type { Category, PlannedExpense, Transaction } from '../types';
-import { plannedExpenseMonthlyAmount } from '../utils/date';
+import type { Category, PlannedExpense, SavingsGoal, Transaction } from '../types';
+import { plannedExpenseMonthlyAmount, savingsGoalMonthlyAmount } from '../utils/date';
 import { formatMoney } from '../utils/money';
 
 type CashFlowReportModalProps = {
@@ -13,6 +13,7 @@ type CashFlowReportModalProps = {
   onClose: () => void;
   plannedExpenses: PlannedExpense[];
   previousMonthToDateSpent: number;
+  savingsGoals: SavingsGoal[];
   transactions: Transaction[];
   visible: boolean;
 };
@@ -46,6 +47,7 @@ export function CashFlowReportModal({
   onClose,
   plannedExpenses,
   previousMonthToDateSpent,
+  savingsGoals,
   transactions,
   visible,
 }: CashFlowReportModalProps) {
@@ -66,9 +68,13 @@ export function CashFlowReportModal({
     .reduce((sum, transaction) => sum + transaction.amount, 0);
   const categorizedSpending = categories.reduce((sum, category) => sum + category.spent, 0);
   const spent = Math.max(transactionOutflows, categorizedSpending);
-  const setAside = plannedExpenses
+  const plannedExpenseSetAside = plannedExpenses
     .filter((expense) => !expense.covered)
     .reduce((sum, expense) => sum + plannedExpenseMonthlyAmount(expense.amount, expense.targetMonth), 0);
+  const savingsGoalSetAside = savingsGoals.reduce((sum, goal) => (
+    sum + savingsGoalMonthlyAmount(goal.targetAmount, goal.currentAmount, goal.targetMonth)
+  ), 0);
+  const setAside = plannedExpenseSetAside + savingsGoalSetAside;
   const available = income - spent - setAside;
   const flexiblePlan = categories.reduce((sum, category) => sum + category.budget, 0);
   const totalPlan = bills + flexiblePlan + setAside;
@@ -146,7 +152,7 @@ export function CashFlowReportModal({
           </View>
           <MoneyRow color={colors.accent} label="Spent" value={spent} />
           <View style={styles.divider} />
-          <MoneyRow color="#80A9F8" detail="For planned one-time expenses" label="Set aside" value={setAside} />
+          <MoneyRow color="#80A9F8" detail="For planned expenses and savings goals" label="Set aside" value={setAside} />
           <View style={styles.divider} />
           <MoneyRow color="#A9C8B4" label={isOver ? 'Over expected income' : 'Available'} value={Math.abs(available)} />
         </View>
@@ -252,7 +258,9 @@ export function CashFlowReportModal({
           <View style={styles.divider} />
           <MoneyRow label="Flexible budgets" value={flexiblePlan} />
           <View style={styles.divider} />
-          <MoneyRow label="One-time set-asides" value={setAside} />
+          <MoneyRow label="One-time set-asides" value={plannedExpenseSetAside} />
+          <View style={styles.divider} />
+          <MoneyRow label="Savings goal pace" value={savingsGoalSetAside} />
           <View style={styles.planDivider} />
           <MoneyRow detail={`${formatMoney(totalPlan)} total planned`} label="Plan buffer" value={buffer} />
         </View>

@@ -1,4 +1,4 @@
-import type { Account, Category, PlannedExpense, RecurringBill, Transaction } from '../types';
+import type { Account, Category, PlannedExpense, RecurringBill, SavingsGoal, Transaction } from '../types';
 
 export const monthlyIncome = 7000;
 export const monthlyBills = 2780;
@@ -13,6 +13,10 @@ export const initialRecurringBills: RecurringBill[] = [
 
 export const initialPlannedExpenses: PlannedExpense[] = [
   { id: 'p1', name: 'Holiday travel', amount: 900, targetMonth: '2026-12-01', categoryId: 'fun', covered: false },
+];
+
+export const initialSavingsGoals: SavingsGoal[] = [
+  { id: 'g1', name: 'Emergency fund', targetAmount: 10000, currentAmount: 6800, targetMonth: '2027-06-01' },
 ];
 
 export const initialCategories: Category[] = [
