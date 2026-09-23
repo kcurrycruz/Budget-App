@@ -1,7 +1,7 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
 
 import { supabase } from '../lib/supabase';
-import type { Account, Category, CategoryDraft, ManualTransactionDraft, MerchantRule, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, Transaction } from '../types';
+import type { Account, Category, CategoryDraft, ManualTransactionDraft, MerchantRule, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SpendingGroup, Transaction } from '../types';
 import { formatActivityDate, toDateOnly } from '../utils/date';
 
 export type CloudBudgetData = {
@@ -22,6 +22,7 @@ type CategoryRow = {
   color: string;
   icon: string;
   monthly_limit: number | string;
+  spending_group: SpendingGroup;
 };
 
 type AccountRow = {
@@ -150,7 +151,7 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
 
   const [monthResult, categoriesResult, subcategoriesResult, accountsResult, transactionsResult, previousTransactionsResult, billsResult, billPaymentsResult, merchantRulesResult, plannedExpensesResult] = await Promise.all([
     client.from('budget_months').select('expected_income, fixed_costs').eq('month', start).maybeSingle(),
-    client.from('categories').select('id, name, color, icon, monthly_limit').is('archived_at', null).order('sort_order'),
+    client.from('categories').select('id, name, color, icon, monthly_limit, spending_group').is('archived_at', null).order('sort_order'),
     client.from('subcategories').select('id, category_id, name').is('archived_at', null).order('sort_order').order('name'),
     client.from('financial_accounts').select('id, display_name, institution_name, mask, account_type, current_balance, connection_status, plaid_item_id, last_synced_at').is('disconnected_at', null).order('created_at'),
     client.from('transactions').select('id, merchant_name, category_id, subcategory_id, financial_account_id, amount, direction, needs_review, transaction_date, pending, source, note').gte('transaction_date', start).lt('transaction_date', end).order('transaction_date', { ascending: false }).order('created_at', { ascending: false }),
@@ -193,6 +194,7 @@ export async function loadCloudBudget(): Promise<CloudBudgetData> {
     name: category.name,
     color: category.color,
     icon: category.icon,
+    spendingGroup: category.spending_group,
     spent: spending.get(category.id) ?? 0,
     budget: Number(category.monthly_limit),
     subcategories: (subcategoriesByCategory.get(category.id) ?? []).map((subcategory) => ({
@@ -518,10 +520,11 @@ export async function createCategory(draft: CategoryDraft, sortOrder: number) {
     name: draft.name,
     color: draft.color,
     icon: draft.icon,
+    spending_group: draft.spendingGroup,
     sort_order: sortOrder,
-  }).select('id, name, color, icon, monthly_limit').single();
+  }).select('id, name, color, icon, monthly_limit, spending_group').single();
   if (error) throw error;
-  return { id: data.id, name: data.name, color: data.color, icon: data.icon, spent: 0, budget: Number(data.monthly_limit), subcategories: [] } satisfies Category;
+  return { id: data.id, name: data.name, color: data.color, icon: data.icon, spendingGroup: data.spending_group as SpendingGroup, spent: 0, budget: Number(data.monthly_limit), subcategories: [] } satisfies Category;
 }
 
 export async function updateCategory(categoryId: string, draft: CategoryDraft) {
@@ -530,8 +533,9 @@ export async function updateCategory(categoryId: string, draft: CategoryDraft) {
     name: draft.name,
     color: draft.color,
     icon: draft.icon,
+    spending_group: draft.spendingGroup,
     updated_at: new Date().toISOString(),
-  }).eq('id', categoryId).select('id, name, color, icon').single();
+  }).eq('id', categoryId).select('id, name, color, icon, spending_group').single();
   if (error) throw error;
   return data;
 }
@@ -584,7 +588,7 @@ export async function exportCloudBudget() {
   const [profileResult, monthsResult, categoriesResult, subcategoriesResult, accountsResult, transactionsResult, recurringBillsResult, recurringBillPaymentsResult, merchantRulesResult, plannedExpensesResult] = await Promise.all([
     client.from('profiles').select('full_name, created_at, updated_at').single(),
     client.from('budget_months').select('month, expected_income, fixed_costs, created_at, updated_at').order('month'),
-    client.from('categories').select('name, color, icon, monthly_limit, sort_order, archived_at, created_at, updated_at').order('sort_order'),
+    client.from('categories').select('name, color, icon, monthly_limit, spending_group, sort_order, archived_at, created_at, updated_at').order('sort_order'),
     client.from('subcategories').select('name, category_id, sort_order, archived_at, created_at, updated_at').order('sort_order'),
     client.from('financial_accounts').select('display_name, institution_name, mask, account_type, current_balance, currency_code, last_synced_at, disconnected_at, created_at, updated_at').order('created_at'),
     client.from('transactions').select('merchant_name, amount, direction, needs_review, plaid_category_primary, plaid_category_detailed, transaction_date, pending, source, note, category_id, subcategory_id, financial_account_id, created_at, updated_at').order('transaction_date', { ascending: false }),

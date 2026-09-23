@@ -16,11 +16,11 @@ export const initialPlannedExpenses: PlannedExpense[] = [
 ];
 
 export const initialCategories: Category[] = [
-  { id: 'home', name: 'Home', color: '#5C7CFA', icon: 'home-variant-outline', spent: 1820, budget: 2100, subcategories: [{ id: 'home-utilities', categoryId: 'home', name: 'Utilities' }] },
-  { id: 'food', name: 'Food', color: '#E98A4C', icon: 'silverware-fork-knife', spent: 486, budget: 650, subcategories: [{ id: 'food-groceries', categoryId: 'food', name: 'Groceries' }, { id: 'food-dining', categoryId: 'food', name: 'Dining out' }] },
-  { id: 'transport', name: 'Transport', color: '#A16AE8', icon: 'car-outline', spent: 218, budget: 350, subcategories: [{ id: 'transport-transit', categoryId: 'transport', name: 'Public transit' }] },
-  { id: 'fun', name: 'Fun', color: '#D65D7A', icon: 'ticket-outline', spent: 164, budget: 300, subcategories: [] },
-  { id: 'other', name: 'Other', color: '#5A9E91', icon: 'dots-horizontal-circle-outline', spent: 92, budget: 250, subcategories: [] },
+  { id: 'home', name: 'Home', color: '#5C7CFA', icon: 'home-variant-outline', spendingGroup: 'needs', spent: 1820, budget: 2100, subcategories: [{ id: 'home-utilities', categoryId: 'home', name: 'Utilities' }] },
+  { id: 'food', name: 'Food', color: '#E98A4C', icon: 'silverware-fork-knife', spendingGroup: 'needs', spent: 486, budget: 650, subcategories: [{ id: 'food-groceries', categoryId: 'food', name: 'Groceries' }, { id: 'food-dining', categoryId: 'food', name: 'Dining out' }] },
+  { id: 'transport', name: 'Transport', color: '#A16AE8', icon: 'car-outline', spendingGroup: 'needs', spent: 218, budget: 350, subcategories: [{ id: 'transport-transit', categoryId: 'transport', name: 'Public transit' }] },
+  { id: 'fun', name: 'Fun', color: '#D65D7A', icon: 'ticket-outline', spendingGroup: 'wants', spent: 164, budget: 300, subcategories: [] },
+  { id: 'other', name: 'Other', color: '#5A9E91', icon: 'dots-horizontal-circle-outline', spendingGroup: 'wants', spent: 92, budget: 250, subcategories: [] },
 ];
 
 export const initialTransactions: Transaction[] = [

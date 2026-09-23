@@ -92,6 +92,16 @@ export function CashFlowReportModal({
     : spendingTrend === 'same'
       ? `The same as ${previousMonth} by this date.`
       : `${spendingChangePercent}% ${spendingTrend === 'down' ? 'less' : 'more'} than ${previousMonth} by this date.`;
+  const groupedSpending = categories.reduce((totals, category) => ({
+    ...totals,
+    [category.spendingGroup]: totals[category.spendingGroup] + category.spent,
+  }), { needs: 0, wants: 0, savings: 0 });
+  const categorizedSpendingTotal = groupedSpending.needs + groupedSpending.wants + groupedSpending.savings;
+  const spendingGroups = [
+    { id: 'needs' as const, label: 'Needs', color: '#5C7CFA', detail: 'Essentials' },
+    { id: 'wants' as const, label: 'Wants', color: colors.accent, detail: 'Lifestyle' },
+    { id: 'savings' as const, label: 'Savings', color: '#5A9E91', detail: 'Goals and reserves' },
+  ];
 
   return (
     <Modal animationType="slide" onRequestClose={onClose} presentationStyle="pageSheet" visible={visible}>
@@ -197,6 +207,40 @@ export function CashFlowReportModal({
           </View>
         </View>
 
+        <View style={styles.groupCard}>
+          <View style={styles.sectionHeading}>
+            <View>
+              <Text style={styles.sectionTitle}>Needs, Wants & Savings</Text>
+              <Text style={styles.sectionDetail}>Share of categorized spending</Text>
+            </View>
+            <MaterialCommunityIcons color={colors.inkMuted} name="chart-donut" size={23} />
+          </View>
+          {spendingGroups.map((group, index) => {
+            const amount = groupedSpending[group.id];
+            const percent = categorizedSpendingTotal > 0 ? Math.round((amount / categorizedSpendingTotal) * 100) : 0;
+            const width = `${percent}%` as `${number}%`;
+            return <View key={group.id} style={[styles.groupRow, index < spendingGroups.length - 1 && styles.groupRowSpacing]}>
+              <View style={styles.groupLabelRow}>
+                <View style={styles.groupNameBlock}>
+                  <View style={[styles.legendDot, { backgroundColor: group.color }]} />
+                  <View>
+                    <Text style={styles.groupName}>{group.label}</Text>
+                    <Text style={styles.groupDetail}>{group.detail}</Text>
+                  </View>
+                </View>
+                <View style={styles.groupAmountBlock}>
+                  <Text style={styles.groupPercent}>{percent}%</Text>
+                  <Text style={styles.groupAmount}>{formatMoney(amount)}</Text>
+                </View>
+              </View>
+              <View style={styles.groupTrack}>
+                <View style={[styles.groupBar, { backgroundColor: group.color, width }]} />
+              </View>
+            </View>;
+          })}
+          <Text style={styles.groupFootnote}>Change a category’s group anytime in Manage categories.</Text>
+        </View>
+
         <View style={styles.planCard}>
           <View style={styles.sectionHeading}>
             <View>
@@ -272,6 +316,19 @@ const styles = StyleSheet.create({
   previousComparisonBar: { backgroundColor: '#A9C8B4' },
   trendMessage: { borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   trendMessageText: { fontSize: 11, fontWeight: '700', lineHeight: 16 },
+  groupCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, padding: spacing.lg },
+  groupRow: { gap: spacing.sm },
+  groupRowSpacing: { marginBottom: spacing.lg },
+  groupLabelRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  groupNameBlock: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },
+  groupName: { color: colors.ink, fontSize: 13, fontWeight: '800' },
+  groupDetail: { color: colors.inkMuted, fontSize: 10, marginTop: 2 },
+  groupAmountBlock: { alignItems: 'flex-end' },
+  groupPercent: { color: colors.ink, fontSize: 13, fontWeight: '800' },
+  groupAmount: { color: colors.inkMuted, fontSize: 10, marginTop: 2 },
+  groupTrack: { backgroundColor: colors.surfaceMuted, borderRadius: radius.pill, height: 8, overflow: 'hidden' },
+  groupBar: { borderRadius: radius.pill, height: '100%' },
+  groupFootnote: { color: colors.inkMuted, fontSize: 10, lineHeight: 15, marginTop: spacing.lg },
   planCard: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.lg },
   planDivider: { backgroundColor: colors.ink, height: 1, marginVertical: spacing.xs, opacity: 0.14 },
   noteCard: { alignItems: 'flex-start', backgroundColor: colors.primarySoft, borderRadius: radius.md, flexDirection: 'row', gap: spacing.md, padding: spacing.lg },

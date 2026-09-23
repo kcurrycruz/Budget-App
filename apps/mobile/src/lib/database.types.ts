@@ -62,6 +62,7 @@ export type Database = {
           monthly_limit: number
           name: string
           sort_order: number
+          spending_group: string
           updated_at: string
           user_id: string
         }
@@ -74,6 +75,7 @@ export type Database = {
           monthly_limit?: number
           name: string
           sort_order?: number
+          spending_group?: string
           updated_at?: string
           user_id?: string
         }
@@ -86,6 +88,7 @@ export type Database = {
           monthly_limit?: number
           name?: string
           sort_order?: number
+          spending_group?: string
           updated_at?: string
           user_id?: string
         }

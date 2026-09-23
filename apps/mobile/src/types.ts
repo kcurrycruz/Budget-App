@@ -1,8 +1,11 @@
+export type SpendingGroup = 'needs' | 'wants' | 'savings';
+
 export type Category = {
   id: string;
   name: string;
   color: string;
   icon: string;
+  spendingGroup: SpendingGroup;
   spent: number;
   budget: number;
   subcategories: Subcategory[];
@@ -18,6 +21,7 @@ export type CategoryDraft = {
   name: string;
   color: string;
   icon: string;
+  spendingGroup: SpendingGroup;
 };
 
 export type Transaction = {
