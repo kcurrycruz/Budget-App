@@ -1,6 +1,6 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { colors, radius, spacing } from '../theme';
 import type { Category, CategoryDraft, SpendingGroup, Subcategory } from '../types';
@@ -16,19 +16,121 @@ const spendingGroups: { detail: string; icon: keyof typeof MaterialCommunityIcon
   { id: 'personal', label: 'Personal', detail: 'Your own flexible spending', icon: 'account-heart-outline' },
 ];
 
+const categoryRowHeight = 69;
+
 type Props = {
   archivedCategories: Category[];
   categories: Category[];
   visible: boolean;
   onArchiveCategory: (category: Category) => Promise<void>;
   onClose: () => void;
-  onMoveCategory: (category: Category, direction: -1 | 1) => Promise<void>;
+  onReorderCategories: (categories: Category[]) => Promise<void>;
   onRestoreCategory: (category: Category) => Promise<void>;
   onSaveCategory: (category: Category | null, draft: CategoryDraft) => Promise<void>;
   onSaveSubcategory: (categoryId: string, name: string, subcategory?: Subcategory) => Promise<void>;
 };
 
-export function CategoryManagerModal({ archivedCategories, categories, visible, onArchiveCategory, onClose, onMoveCategory, onRestoreCategory, onSaveCategory, onSaveSubcategory }: Props) {
+type DraggableCategoryRowProps = {
+  category: Category;
+  disabled: boolean;
+  groupLabel: string;
+  index: number;
+  itemCount: number;
+  onDrop: (fromIndex: number, toIndex: number) => void;
+  onEdit: () => void;
+  showDivider: boolean;
+};
+
+function DraggableCategoryRow({ category, disabled, groupLabel, index, itemCount, onDrop, onEdit, showDivider }: DraggableCategoryRowProps) {
+  const translateY = useRef(new Animated.Value(0)).current;
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragReady = useRef(false);
+  const [dragging, setDragging] = useState(false);
+
+  const stopHoldTimer = () => {
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+    holdTimer.current = null;
+  };
+
+  useEffect(() => () => stopHoldTimer(), []);
+
+  const panResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => !disabled,
+    onMoveShouldSetPanResponder: () => !disabled,
+    onPanResponderGrant: () => {
+      stopHoldTimer();
+      holdTimer.current = setTimeout(() => {
+        dragReady.current = true;
+        setDragging(true);
+      }, 220);
+    },
+    onPanResponderMove: (_event, gesture) => {
+      if (!dragReady.current) return;
+      const minY = -index * categoryRowHeight;
+      const maxY = (itemCount - index - 1) * categoryRowHeight;
+      translateY.setValue(Math.max(minY, Math.min(maxY, gesture.dy)));
+    },
+    onPanResponderRelease: (_event, gesture) => {
+      stopHoldTimer();
+      const wasDragging = dragReady.current;
+      dragReady.current = false;
+      setDragging(false);
+      translateY.setValue(0);
+      if (!wasDragging) return;
+      const offset = Math.round(gesture.dy / categoryRowHeight);
+      const targetIndex = Math.max(0, Math.min(itemCount - 1, index + offset));
+      if (targetIndex !== index) onDrop(index, targetIndex);
+    },
+    onPanResponderTerminate: () => {
+      stopHoldTimer();
+      dragReady.current = false;
+      setDragging(false);
+      translateY.setValue(0);
+    },
+    onPanResponderTerminationRequest: () => !dragReady.current,
+  }), [disabled, index, itemCount, onDrop, translateY]);
+
+  const moveWithAccessibility = (direction: -1 | 1) => {
+    const targetIndex = index + direction;
+    if (!disabled && targetIndex >= 0 && targetIndex < itemCount) onDrop(index, targetIndex);
+  };
+
+  return <>
+      <Animated.View style={[styles.draggableRow, dragging && styles.draggableRowActive, { transform: [{ translateY }] }]}>
+        <View style={styles.row}>
+          <View
+            accessibilityActions={[{ name: 'increment', label: 'Move down' }, { name: 'decrement', label: 'Move up' }]}
+            accessibilityHint="Press and hold, then drag up or down"
+            accessibilityLabel={`Reorder ${category.name}`}
+            accessibilityRole="adjustable"
+            accessibilityValue={{ max: itemCount, min: 1, now: index + 1, text: `Position ${index + 1} of ${itemCount}` }}
+            onAccessibilityAction={(event) => {
+              if (event.nativeEvent.actionName === 'increment') moveWithAccessibility(1);
+              if (event.nativeEvent.actionName === 'decrement') moveWithAccessibility(-1);
+            }}
+            style={[styles.dragHandle, dragging && styles.dragHandleActive]}
+            {...panResponder.panHandlers}
+          >
+            <MaterialCommunityIcons color={dragging ? colors.primaryDark : colors.inkMuted} name="drag-vertical" size={24} />
+          </View>
+          <Pressable accessibilityLabel={`Edit ${category.name}`} disabled={dragging} onPress={onEdit} style={styles.rowMain}>
+            <View style={[styles.iconBox, { backgroundColor: `${category.color}1A` }]}>
+              <MaterialCommunityIcons color={category.color} name={category.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={22} />
+            </View>
+            <View style={styles.rowCopy}>
+              <Text style={styles.rowTitle}>{category.name}</Text>
+              <Text numberOfLines={1} style={styles.rowDetail}>{groupLabel} · {category.subcategories.length ? category.subcategories.map((item) => item.name).join(' · ') : 'No subcategories'}</Text>
+            </View>
+            <MaterialCommunityIcons color={colors.inkMuted} name="chevron-right" size={21} />
+          </Pressable>
+        </View>
+      </Animated.View>
+      {showDivider ? <View style={styles.divider} /> : null}
+    </>;
+}
+
+export function CategoryManagerModal({ archivedCategories, categories, visible, onArchiveCategory, onClose, onReorderCategories, onRestoreCategory, onSaveCategory, onSaveSubcategory }: Props) {
+  const [orderedCategories, setOrderedCategories] = useState(categories);
   const [editing, setEditing] = useState<Category | null | undefined>(undefined);
   const [name, setName] = useState('');
   const [color, setColor] = useState<string>(colorOptions[0]!);
@@ -38,6 +140,10 @@ export function CategoryManagerModal({ archivedCategories, categories, visible, 
   const [subcategoryName, setSubcategoryName] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    setOrderedCategories(categories);
+  }, [categories]);
 
   useEffect(() => {
     if (!visible) {
@@ -86,12 +192,19 @@ export function CategoryManagerModal({ archivedCategories, categories, visible, 
     }
   };
 
-  const moveCategory = async (category: Category, direction: -1 | 1) => {
+  const reorderCategory = async (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex || saving) return;
+    const reordered = [...orderedCategories];
+    const [moved] = reordered.splice(fromIndex, 1);
+    if (!moved) return;
+    reordered.splice(toIndex, 0, moved);
+    setOrderedCategories(reordered);
     setSaving(true);
     setError('');
     try {
-      await onMoveCategory(category, direction);
+      await onReorderCategories(reordered);
     } catch (caught) {
+      setOrderedCategories(categories);
       setError(caught instanceof Error ? caught.message : 'Could not reorder your categories.');
     } finally {
       setSaving(false);
@@ -149,34 +262,22 @@ export function CategoryManagerModal({ archivedCategories, categories, visible, 
           {editing === undefined ? <>
             <View style={styles.intro}>
               <MaterialCommunityIcons color={colors.primaryDark} name="shape-outline" size={22} />
-              <Text style={styles.introText}>Use the arrows to set your plan order. Open a category to edit details, add subcategories, or archive it.</Text>
+              <Text style={styles.introText}>Press and hold the grip, then drag a category into place. Tap the category to edit its details.</Text>
             </View>
             <View style={styles.list}>
-              {categories.map((category, index) => <View key={category.id}>
-                <View style={styles.row}>
-                  <Pressable accessibilityLabel={`Edit ${category.name}`} onPress={() => openEditor(category)} style={styles.rowMain}>
-                    <View style={[styles.iconBox, { backgroundColor: `${category.color}1A` }]}>
-                      <MaterialCommunityIcons color={category.color} name={category.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={22} />
-                    </View>
-                    <View style={styles.rowCopy}>
-                      <Text style={styles.rowTitle}>{category.name}</Text>
-                      <Text numberOfLines={1} style={styles.rowDetail}>{spendingGroups.find((group) => group.id === category.spendingGroup)?.label ?? 'Needs'} · {category.subcategories.length ? category.subcategories.map((item) => item.name).join(' · ') : 'No subcategories'}</Text>
-                    </View>
-                  </Pressable>
-                  <View style={styles.reorderActions}>
-                    <Pressable accessibilityLabel={`Move ${category.name} up`} disabled={saving || index === 0} onPress={() => { void moveCategory(category, -1); }} style={[styles.orderButton, index === 0 && styles.orderButtonDisabled]}>
-                      <MaterialCommunityIcons color={colors.inkMuted} name="chevron-up" size={20} />
-                    </Pressable>
-                    <Pressable accessibilityLabel={`Move ${category.name} down`} disabled={saving || index === categories.length - 1} onPress={() => { void moveCategory(category, 1); }} style={[styles.orderButton, index === categories.length - 1 && styles.orderButtonDisabled]}>
-                      <MaterialCommunityIcons color={colors.inkMuted} name="chevron-down" size={20} />
-                    </Pressable>
-                  </View>
-                  <Pressable accessibilityLabel={`Edit ${category.name}`} onPress={() => openEditor(category)} style={styles.editCategoryButton}>
-                    <MaterialCommunityIcons color={colors.inkMuted} name="chevron-right" size={21} />
-                  </Pressable>
-                </View>
-                {index < categories.length - 1 ? <View style={styles.divider} /> : null}
-              </View>)}
+              {orderedCategories.map((category, index) =>
+                <DraggableCategoryRow
+                  category={category}
+                  disabled={saving}
+                  groupLabel={spendingGroups.find((group) => group.id === category.spendingGroup)?.label ?? 'Needs'}
+                  index={index}
+                  itemCount={orderedCategories.length}
+                  key={category.id}
+                  onDrop={(from, to) => { void reorderCategory(from, to); }}
+                  onEdit={() => openEditor(category)}
+                  showDivider={index < orderedCategories.length - 1}
+                />
+              )}
             </View>
             <Pressable onPress={() => openEditor(null)} style={styles.primaryButton}>
               <MaterialCommunityIcons color={colors.white} name="plus" size={20} />
@@ -275,17 +376,17 @@ const styles = StyleSheet.create({
   intro: { alignItems: 'flex-start', backgroundColor: colors.primarySoft, borderRadius: radius.md, flexDirection: 'row', gap: spacing.md, padding: spacing.lg },
   introText: { color: colors.primaryDark, flex: 1, fontSize: 13, lineHeight: 19 },
   list: { backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.lg },
-  row: { alignItems: 'center', flexDirection: 'row', paddingVertical: spacing.md },
-  rowMain: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: spacing.md, minWidth: 0 },
+  draggableRow: { backgroundColor: colors.surface, zIndex: 0 },
+  draggableRowActive: { borderRadius: radius.md, elevation: 7, opacity: 0.97, shadowColor: colors.ink, shadowOffset: { height: 5, width: 0 }, shadowOpacity: 0.16, shadowRadius: 10, zIndex: 10 },
+  row: { alignItems: 'center', flexDirection: 'row', minHeight: categoryRowHeight },
+  dragHandle: { alignItems: 'center', alignSelf: 'stretch', justifyContent: 'center', width: 40 },
+  dragHandleActive: { backgroundColor: colors.primarySoft, borderRadius: radius.sm },
+  rowMain: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: spacing.md, minWidth: 0, paddingVertical: spacing.md },
   iconBox: { alignItems: 'center', borderRadius: radius.md, height: 44, justifyContent: 'center', width: 44 },
   rowCopy: { flex: 1, gap: 3 },
   rowTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' },
   rowDetail: { color: colors.inkMuted, fontSize: 11, lineHeight: 16 },
-  reorderActions: { gap: 2, marginLeft: spacing.xs },
-  orderButton: { alignItems: 'center', height: 28, justifyContent: 'center', width: 30 },
-  orderButtonDisabled: { opacity: 0.2 },
-  editCategoryButton: { alignItems: 'center', height: 44, justifyContent: 'center', width: 30 },
-  divider: { backgroundColor: colors.border, height: StyleSheet.hairlineWidth, marginLeft: 56 },
+  divider: { backgroundColor: colors.border, height: StyleSheet.hairlineWidth, marginLeft: 96 },
   fieldGroup: { gap: spacing.sm },
   label: { color: colors.ink, fontSize: 13, fontWeight: '800' },
   fieldDetail: { color: colors.inkMuted, fontSize: 11, lineHeight: 16, marginTop: -4 },

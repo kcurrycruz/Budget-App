@@ -872,16 +872,15 @@ function BudgetApp({ session }: BudgetAppProps) {
       : category));
   };
 
-  const moveCategory = async (category: Category, direction: -1 | 1) => {
-    const currentIndex = categories.findIndex((item) => item.id === category.id);
-    const nextIndex = currentIndex + direction;
-    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= categories.length) return;
-    const reordered = [...categories];
-    const [moved] = reordered.splice(currentIndex, 1);
-    if (!moved) return;
-    reordered.splice(nextIndex, 0, moved);
-    if (session) await reorderCategories(reordered.map((item) => item.id));
+  const saveCategoryOrder = async (reordered: Category[]) => {
+    const previous = categories;
     setCategories(reordered);
+    try {
+      if (session) await reorderCategories(reordered.map((item) => item.id));
+    } catch (error) {
+      setCategories(previous);
+      throw error;
+    }
   };
 
   const archiveCategory = async (category: Category) => {
@@ -1187,7 +1186,7 @@ function BudgetApp({ session }: BudgetAppProps) {
         categories={categories}
         onArchiveCategory={archiveCategory}
         onClose={() => setCategoryManagerOpen(false)}
-        onMoveCategory={moveCategory}
+        onReorderCategories={saveCategoryOrder}
         onRestoreCategory={restoreCategory}
         onSaveCategory={saveCategory}
         onSaveSubcategory={saveSubcategory}
