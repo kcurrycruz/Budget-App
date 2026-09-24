@@ -67,6 +67,9 @@ export type PlannedExpense = {
   amount: number;
   targetMonth: string;
   categoryId?: string;
+  autoFund: boolean;
+  contributions: PlannedExpenseContribution[];
+  savedAmount: number;
   covered: boolean;
   coveredAt?: string;
 };
@@ -76,6 +79,14 @@ export type PlannedExpenseDraft = {
   amount: number;
   targetMonth: string;
   categoryId?: string;
+  autoFund: boolean;
+};
+
+export type PlannedExpenseContribution = {
+  id: string;
+  amount: number;
+  contributionMonth: string;
+  createdAt: string;
 };
 
 export type SavingsGoal = {

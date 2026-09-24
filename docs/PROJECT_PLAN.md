@@ -66,7 +66,7 @@ The app will cover the thread's requests through progressive disclosure: the def
 
 - A simple cash-flow report is now available inside Plan, combining expected and received income, actual spending, one-time set-asides, budget totals, and remaining availability.
 - Month-to-date spending now includes a comparison with the same point last month plus editable Needs, Wants, and Savings percentage views.
-- Savings goals now include dated contribution history inside Plan, alongside progress, target dates, and a suggested monthly pace. Accounts now includes a connected-balance net-worth snapshot and private monthly history. Add sinking-fund automation without putting it on the primary Home screen.
+- Savings goals now include dated contribution history inside Plan, alongside progress, target dates, and a suggested monthly pace. Planned expenses can optionally record one suggested sinking-fund contribution each month, while Accounts includes a connected-balance net-worth snapshot and private monthly history.
 - Spreadsheet data is now portable from Account settings: users can export the current month as a clean CSV and preview validated CSV rows before importing them. Add flexible column mapping and full-history exports later.
 
 ### Later — households and power tools
@@ -137,3 +137,4 @@ Record decisions here with the date, decision, and reason. Move longer technical
 - 2026-09-24: Category purpose expands to Needs, Wants, Giving, Saving/Investing, and Personal. The labels remain optional reporting metadata, so they improve the cash-flow breakdown without changing budgets, navigation, or transaction entry.
 - 2026-09-24: Category ordering uses a press-and-hold drag handle with optimistic placement and a single save on drop. Visible arrow controls are removed, while accessibility increment/decrement actions remain available for assistive technology.
 - 2026-09-24: Net-worth history stores one private connected-balance snapshot per month and shows at most six recent checkpoints inside Accounts. Empty accounts never overwrite prior history, and the primary Home screen remains focused on the current month.
+- 2026-09-24: Planned expenses offer opt-in monthly sinking-fund automation. Zenify records one private bookkeeping contribution per expense per month, recalculates the remaining pace, and never claims to transfer money between financial accounts.

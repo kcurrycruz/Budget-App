@@ -12,7 +12,17 @@ export const initialRecurringBills: RecurringBill[] = [
 ];
 
 export const initialPlannedExpenses: PlannedExpense[] = [
-  { id: 'p1', name: 'Holiday travel', amount: 900, targetMonth: '2026-12-01', categoryId: 'fun', covered: false },
+  {
+    id: 'p1',
+    name: 'Holiday travel',
+    amount: 900,
+    targetMonth: '2026-12-01',
+    categoryId: 'fun',
+    autoFund: true,
+    contributions: [{ id: 'pc1', amount: 225, contributionMonth: '2026-09-01', createdAt: '2026-09-24T12:00:00Z' }],
+    savedAmount: 225,
+    covered: false,
+  },
 ];
 
 export const initialSavingsGoals: SavingsGoal[] = [

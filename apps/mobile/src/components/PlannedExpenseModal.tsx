@@ -45,6 +45,7 @@ export function PlannedExpenseModal({
   const [amount, setAmount] = useState('');
   const [targetMonth, setTargetMonth] = useState(monthStart(1));
   const [categoryId, setCategoryId] = useState('');
+  const [autoFund, setAutoFund] = useState(false);
   const monthOptions = useMemo(() => {
     const options = Array.from({ length: 12 }, (_, index) => monthStart(index));
     return initialExpense && !options.includes(initialExpense.targetMonth)
@@ -58,11 +59,13 @@ export function PlannedExpenseModal({
       setAmount(formatMoneyInput(String(initialExpense.amount)));
       setTargetMonth(initialExpense.targetMonth);
       setCategoryId(initialExpense.categoryId ?? '');
+      setAutoFund(initialExpense.autoFund);
     } else if (!visible) {
       setName('');
       setAmount('');
       setTargetMonth(monthStart(1));
       setCategoryId('');
+      setAutoFund(false);
     }
   }, [initialExpense, visible]);
 
@@ -77,6 +80,7 @@ export function PlannedExpenseModal({
       amount: numericAmount,
       targetMonth,
       categoryId: categoryId || undefined,
+      autoFund,
     });
   };
 
@@ -171,10 +175,44 @@ export function PlannedExpenseModal({
             </View>
           </View>
 
+          <Pressable
+            accessibilityRole="switch"
+            accessibilityState={{ checked: autoFund }}
+            onPress={() => setAutoFund((current) => !current)}
+            style={styles.automationCard}
+          >
+            <View style={styles.automationIcon}>
+              <MaterialCommunityIcons color={colors.primaryDark} name="calendar-sync-outline" size={22} />
+            </View>
+            <View style={styles.automationCopy}>
+              <Text style={styles.automationTitle}>Monthly auto set-aside</Text>
+              <Text style={styles.automationText}>Record one suggested contribution each month. This never moves money.</Text>
+            </View>
+            <View style={[styles.switchTrack, autoFund && styles.switchTrackOn]}>
+              <View style={[styles.switchThumb, autoFund && styles.switchThumbOn]} />
+            </View>
+          </Pressable>
+
+          {initialExpense && initialExpense.savedAmount > 0 ? (
+            <View style={styles.progressCard}>
+              <View style={styles.progressTop}>
+                <Text style={styles.progressLabel}>Tracked in this fund</Text>
+                <Text style={styles.progressValue}>{formatMoney(initialExpense.savedAmount)} of {formatMoney(initialExpense.amount)}</Text>
+              </View>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${Math.min(100, (initialExpense.savedAmount / initialExpense.amount) * 100)}%` }]} />
+              </View>
+            </View>
+          ) : null}
+
           {numericAmount > 0 ? (
             <View style={styles.infoCard}>
               <MaterialCommunityIcons color={colors.primary} name="calendar-clock-outline" size={22} />
-              <Text style={styles.infoText}>Zenify will reserve about <Text style={styles.infoStrong}>{formatMoney(monthlyAmount)} per month</Text> through {formatTargetMonth(targetMonth, true)}. Mark it covered when the money is ready or the expense is paid.</Text>
+              <Text style={styles.infoText}>
+                {autoFund ? 'Zenify will record ' : 'Plan to reserve about '}
+                <Text style={styles.infoStrong}>{formatMoney(monthlyAmount)} per month</Text> through {formatTargetMonth(targetMonth, true)}.
+                {autoFund ? ' The amount automatically adjusts as the target gets closer.' : ' Mark it covered when the money is ready or the expense is paid.'}
+              </Text>
             </View>
           ) : null}
 
@@ -219,6 +257,21 @@ const styles = StyleSheet.create({
   categorySelected: { backgroundColor: colors.primary, borderColor: colors.primary },
   categoryText: { color: colors.ink, fontSize: 12, fontWeight: '700' },
   categoryTextSelected: { color: colors.white },
+  automationCard: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, flexDirection: 'row', gap: spacing.md, padding: spacing.lg },
+  automationIcon: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.sm, height: 42, justifyContent: 'center', width: 42 },
+  automationCopy: { flex: 1, gap: 3 },
+  automationTitle: { color: colors.ink, fontSize: 13, fontWeight: '800' },
+  automationText: { color: colors.inkMuted, fontSize: 11, lineHeight: 16 },
+  switchTrack: { backgroundColor: colors.border, borderRadius: radius.pill, height: 26, justifyContent: 'center', paddingHorizontal: 3, width: 46 },
+  switchTrackOn: { backgroundColor: colors.primary },
+  switchThumb: { backgroundColor: colors.white, borderRadius: radius.pill, height: 20, width: 20 },
+  switchThumbOn: { alignSelf: 'flex-end' },
+  progressCard: { backgroundColor: colors.surface, borderRadius: radius.md, gap: spacing.sm, padding: spacing.lg },
+  progressTop: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  progressLabel: { color: colors.inkMuted, fontSize: 11, fontWeight: '700' },
+  progressValue: { color: colors.ink, fontSize: 12, fontWeight: '800' },
+  progressTrack: { backgroundColor: colors.surfaceMuted, borderRadius: radius.pill, height: 7, overflow: 'hidden' },
+  progressFill: { backgroundColor: colors.primary, borderRadius: radius.pill, height: '100%' },
   infoCard: { alignItems: 'flex-start', backgroundColor: colors.primarySoft, borderRadius: radius.md, flexDirection: 'row', gap: spacing.md, padding: spacing.lg },
   infoText: { color: colors.primaryDark, flex: 1, fontSize: 12, lineHeight: 18 },
   infoStrong: { fontWeight: '800' },

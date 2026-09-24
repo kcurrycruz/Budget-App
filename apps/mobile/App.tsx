@@ -625,11 +625,18 @@ function BudgetApp({ session }: BudgetAppProps) {
       } else {
         const saved = session
           ? await createPlannedExpense(draft)
-          : { id: `planned-${Date.now()}`, ...draft, covered: false } satisfies PlannedExpense;
+          : {
+              id: `planned-${Date.now()}`,
+              ...draft,
+              contributions: [],
+              savedAmount: 0,
+              covered: false,
+            } satisfies PlannedExpense;
         setPlannedExpenses((current) => sortPlannedExpenses([...current, saved]));
       }
       setPlannedExpenseOpen(false);
       setEditingPlannedExpense(null);
+      if (session) await refreshCloudData();
     } catch (caught) {
       showMessage('Could not save planned expense', caught instanceof Error ? caught.message : 'Please try again.');
     } finally {
@@ -639,13 +646,18 @@ function BudgetApp({ session }: BudgetAppProps) {
 
   const togglePlannedExpenseCovered = async (expense: PlannedExpense) => {
     try {
-      const saved = session
+      const updated = session
         ? await setPlannedExpenseCovered(expense.id, !expense.covered)
         : {
             ...expense,
             covered: !expense.covered,
             coveredAt: !expense.covered ? new Date().toISOString() : undefined,
           };
+      const saved = {
+        ...updated,
+        contributions: expense.contributions,
+        savedAmount: expense.savedAmount,
+      };
       setPlannedExpenses((current) => sortPlannedExpenses(current.map((item) => item.id === expense.id ? saved : item)));
     } catch (caught) {
       showMessage('Could not update planned expense', caught instanceof Error ? caught.message : 'Please try again.');

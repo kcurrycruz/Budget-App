@@ -8,7 +8,7 @@ import { RecurringBillRow } from '../components/RecurringBillRow';
 import { TransactionRow } from '../components/TransactionRow';
 import { colors, radius, shadow, spacing } from '../theme';
 import type { Category, PlannedExpense, RecurringBill, Transaction } from '../types';
-import { formatMonth, plannedExpenseMonthlyAmount } from '../utils/date';
+import { formatMonth, plannedExpenseMonthlySetAside } from '../utils/date';
 import { formatMoney } from '../utils/money';
 
 type HomeScreenProps = {
@@ -62,7 +62,7 @@ export function HomeScreen({
   const hasPlan = income > 0 || categories.some((category) => category.budget > 0);
   const plannedSetAside = plannedExpenses
     .filter((expense) => !expense.covered)
-    .reduce((sum, expense) => sum + plannedExpenseMonthlyAmount(expense.amount, expense.targetMonth, month), 0);
+    .reduce((sum, expense) => sum + plannedExpenseMonthlySetAside(expense, month), 0);
   const left = hasPlan ? income - spent - plannedSetAside : 0;
   const upcomingBills = recurringBills.filter((bill) => !bill.paid).slice(0, 3);
   const upcomingExpenses = plannedExpenses.filter((expense) => !expense.covered).slice(0, 2);

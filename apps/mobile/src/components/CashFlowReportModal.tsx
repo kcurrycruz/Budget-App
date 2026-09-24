@@ -3,7 +3,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 
 import { colors, radius, spacing } from '../theme';
 import type { Category, PlannedExpense, SavingsGoal, SpendingGroup, Transaction } from '../types';
-import { currentMonthStart, formatMonth, parseDateOnly, plannedExpenseMonthlyAmount, savingsGoalMonthlyAmount, shiftMonth } from '../utils/date';
+import { currentMonthStart, formatMonth, parseDateOnly, plannedExpenseMonthlySetAside, savingsGoalMonthlyAmount, shiftMonth } from '../utils/date';
 import { formatMoney } from '../utils/money';
 
 type CashFlowReportModalProps = {
@@ -75,7 +75,7 @@ export function CashFlowReportModal({
   const spent = Math.max(transactionOutflows, categorizedSpending);
   const plannedExpenseSetAside = plannedExpenses
     .filter((expense) => !expense.covered)
-    .reduce((sum, expense) => sum + plannedExpenseMonthlyAmount(expense.amount, expense.targetMonth, month), 0);
+    .reduce((sum, expense) => sum + plannedExpenseMonthlySetAside(expense, month), 0);
   const savingsGoalSetAside = savingsGoals.reduce((sum, goal) => (
     sum + savingsGoalMonthlyAmount(goal.targetAmount, goal.currentAmount, goal.targetMonth, month)
   ), 0);

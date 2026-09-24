@@ -277,9 +277,52 @@ export type Database = {
           },
         ]
       }
+      planned_expense_contributions: {
+        Row: {
+          amount: number
+          contribution_month: string
+          created_at: string
+          id: string
+          planned_expense_id: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          contribution_month: string
+          created_at?: string
+          id?: string
+          planned_expense_id: string
+          user_id?: string
+        }
+        Update: {
+          amount?: number
+          contribution_month?: string
+          created_at?: string
+          id?: string
+          planned_expense_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planned_expense_contributions_expense_owner_fkey"
+            columns: ["planned_expense_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "planned_expenses"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "planned_expense_contributions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       planned_expenses: {
         Row: {
           amount: number
+          auto_fund: boolean
           category_id: string | null
           covered_at: string | null
           created_at: string
@@ -291,6 +334,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          auto_fund?: boolean
           category_id?: string | null
           covered_at?: string | null
           created_at?: string
@@ -302,6 +346,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          auto_fund?: boolean
           category_id?: string | null
           covered_at?: string | null
           created_at?: string

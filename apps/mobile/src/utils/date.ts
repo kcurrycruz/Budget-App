@@ -1,3 +1,5 @@
+import type { PlannedExpense } from '../types';
+
 export const toDateOnly = (date: Date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -70,6 +72,21 @@ export const plannedExpenseMonthlyAmount = (amount: number, targetMonth: string,
   if (!year || !month) return amount;
   const monthsRemaining = Math.max(1, ((year - now.getFullYear()) * 12) + month - now.getMonth());
   return amount / monthsRemaining;
+};
+
+export const plannedExpenseMonthlySetAside = (expense: PlannedExpense, referenceMonth = currentMonthStart()) => {
+  if (expense.covered) return 0;
+  const recorded = expense.contributions.find((contribution) => contribution.contributionMonth === referenceMonth);
+  if (recorded) return recorded.amount;
+
+  const savedBeforeMonth = expense.contributions
+    .filter((contribution) => contribution.contributionMonth < referenceMonth)
+    .reduce((sum, contribution) => sum + contribution.amount, 0);
+  return plannedExpenseMonthlyAmount(
+    Math.max(expense.amount - savedBeforeMonth, 0),
+    expense.targetMonth,
+    referenceMonth,
+  );
 };
 
 export const savingsGoalMonthlyAmount = (targetAmount: number, currentAmount: number, targetMonth: string, referenceMonth = currentMonthStart()) => (

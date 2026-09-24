@@ -8,7 +8,7 @@ import { SavingsGoalRow } from '../components/SavingsGoalRow';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { colors, radius, spacing } from '../theme';
 import type { Category, PlannedExpense, RecurringBill, SavingsGoal, SubscriptionSuggestion } from '../types';
-import { formatMonth, plannedExpenseMonthlyAmount, savingsGoalMonthlyAmount, shiftMonth } from '../utils/date';
+import { formatMonth, plannedExpenseMonthlySetAside, savingsGoalMonthlyAmount, shiftMonth } from '../utils/date';
 import { formatMoney } from '../utils/money';
 
 type PlanScreenProps = {
@@ -71,7 +71,7 @@ export function PlanScreen({
   const flexibleBudget = categories.reduce((sum, category) => sum + category.budget, 0);
   const plannedSetAside = plannedExpenses
     .filter((expense) => !expense.covered)
-    .reduce((sum, expense) => sum + plannedExpenseMonthlyAmount(expense.amount, expense.targetMonth, month), 0);
+    .reduce((sum, expense) => sum + plannedExpenseMonthlySetAside(expense, month), 0);
   const goalSetAside = savingsGoals.reduce((sum, goal) => (
     sum + savingsGoalMonthlyAmount(goal.targetAmount, goal.currentAmount, goal.targetMonth, month)
   ), 0);
