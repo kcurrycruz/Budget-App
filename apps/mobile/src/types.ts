@@ -148,4 +148,11 @@ export type Account = {
   syncedAt: string;
 };
 
+export type NetWorthSnapshot = {
+  assets: number;
+  debts: number;
+  netWorth: number;
+  snapshotMonth: string;
+};
+
 export type AppTab = 'home' | 'transactions' | 'plan' | 'connect';

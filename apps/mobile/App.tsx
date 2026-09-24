@@ -61,7 +61,7 @@ import { PlanSetupScreen } from './src/screens/PlanSetupScreen';
 import { TransactionsScreen } from './src/screens/TransactionsScreen';
 import { UpdatePasswordScreen } from './src/screens/UpdatePasswordScreen';
 import { colors } from './src/theme';
-import type { AppTab, Category, CategoryDraft, ImportedTransactionDraft, ManualTransactionDraft, MerchantRule, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalContribution, SavingsGoalContributionDraft, SavingsGoalDraft, Subcategory, SubscriptionSuggestion, Transaction } from './src/types';
+import type { AppTab, Category, CategoryDraft, ImportedTransactionDraft, ManualTransactionDraft, MerchantRule, NetWorthSnapshot, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalContribution, SavingsGoalContributionDraft, SavingsGoalDraft, Subcategory, SubscriptionSuggestion, Transaction } from './src/types';
 import { currentMonthStart, formatActivityDate, toDateOnly } from './src/utils/date';
 import { confirmAction, showMessage } from './src/utils/dialogs';
 import { formatMoney } from './src/utils/money';
@@ -288,6 +288,7 @@ function BudgetApp({ session }: BudgetAppProps) {
   const [previousMonthToDateSpent, setPreviousMonthToDateSpent] = useState(cloudMode ? 0 : demoPreviousMonthToDateSpent);
   const [previousPlanAvailable, setPreviousPlanAvailable] = useState(false);
   const [merchantRules, setMerchantRules] = useState<MerchantRule[]>([]);
+  const [netWorthHistory, setNetWorthHistory] = useState<NetWorthSnapshot[]>([]);
   const [plannedExpenses, setPlannedExpenses] = useState<PlannedExpense[]>(cloudMode ? [] : initialPlannedExpenses);
   const [recurringBills, setRecurringBills] = useState<RecurringBill[]>(cloudMode ? [] : initialRecurringBills);
   const [subscriptionSuggestions, setSubscriptionSuggestions] = useState<SubscriptionSuggestion[]>([]);
@@ -339,6 +340,7 @@ function BudgetApp({ session }: BudgetAppProps) {
       setBills(data.bills);
       setPreviousMonthToDateSpent(data.previousMonthToDateSpent);
       setMerchantRules(data.merchantRules);
+      setNetWorthHistory(data.netWorthHistory);
       setPlannedExpenses(data.plannedExpenses);
       setPreviousPlanAvailable(data.previousPlanAvailable);
       setRecurringBills(data.recurringBills);
@@ -1074,7 +1076,7 @@ function BudgetApp({ session }: BudgetAppProps) {
           />
         );
       case 'connect':
-        return <ConnectScreen accounts={connectedAccounts} cloudMode={cloudMode} onAccountsChanged={refreshCloudData} />;
+        return <ConnectScreen accounts={connectedAccounts} cloudMode={cloudMode} netWorthHistory={netWorthHistory} onAccountsChanged={refreshCloudData} />;
       default:
         return (
           <HomeScreen

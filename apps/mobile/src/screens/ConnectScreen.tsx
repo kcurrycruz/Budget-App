@@ -7,29 +7,29 @@ import { ManageConnectionModal } from '../components/ManageConnectionModal';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { disconnectPlaidItem, syncPlaidAccounts } from '../data/budgetRepository';
 import { colors, radius, shadow, spacing } from '../theme';
-import type { Account } from '../types';
+import type { Account, NetWorthSnapshot } from '../types';
 import { formatMoney } from '../utils/money';
+import { summarizeNetWorth } from '../utils/netWorth';
 
 type ConnectScreenProps = {
   accounts: Account[];
   cloudMode: boolean;
+  netWorthHistory: NetWorthSnapshot[];
   onAccountsChanged: () => Promise<void>;
 };
 
-export function ConnectScreen({ accounts, cloudMode, onAccountsChanged }: ConnectScreenProps) {
+const formatSnapshotMonth = (month: string) => new Date(`${month}T00:00:00`).toLocaleDateString('en-US', { month: 'short' });
+
+export function ConnectScreen({ accounts, cloudMode, netWorthHistory, onAccountsChanged }: ConnectScreenProps) {
   const [syncing, setSyncing] = useState(false);
   const [managedAccount, setManagedAccount] = useState<Account | null>(null);
-  const { assets, debts } = accounts.reduce((summary, account) => {
-    if (account.type === 'credit' || account.type === 'loan') {
-      summary.debts += Math.abs(account.balance);
-    } else if (account.balance >= 0) {
-      summary.assets += account.balance;
-    } else {
-      summary.debts += Math.abs(account.balance);
-    }
-    return summary;
-  }, { assets: 0, debts: 0 });
+  const { assets, debts } = summarizeNetWorth(accounts);
   const netWorth = assets - debts;
+  const visibleHistory = netWorthHistory.slice(-6);
+  const maxHistoryValue = Math.max(1, ...visibleHistory.map((snapshot) => Math.abs(snapshot.netWorth)));
+  const firstSnapshot = visibleHistory[0];
+  const latestSnapshot = visibleHistory.at(-1);
+  const historyChange = firstSnapshot && latestSnapshot ? latestSnapshot.netWorth - firstSnapshot.netWorth : 0;
   const sync = async () => {
     setSyncing(true);
     try {
@@ -94,6 +94,60 @@ export function ConnectScreen({ accounts, cloudMode, onAccountsChanged }: Connec
             </View>
           </View>
           <Text style={styles.netWorthNote}>Connected balances only · Updated when accounts sync</Text>
+        </View>
+      ) : null}
+
+      {accounts.length ? (
+        <View style={styles.historyCard}>
+          <View style={styles.historyHeader}>
+            <View style={styles.historyTitleGroup}>
+              <Text style={styles.historyTitle}>Net worth history</Text>
+              <Text style={styles.historyDetail}>Monthly connected-balance checkpoints</Text>
+            </View>
+            {visibleHistory.length > 1 ? (
+              <Text style={[styles.historyChange, historyChange < 0 && styles.historyChangeNegative]}>
+                {historyChange >= 0 ? 'Up ' : 'Down '}{formatMoney(Math.abs(historyChange), true)}
+              </Text>
+            ) : null}
+          </View>
+
+          {visibleHistory.length > 1 ? (
+            <View accessibilityLabel="Net worth history chart" style={styles.historyChart}>
+              {visibleHistory.map((snapshot) => {
+                const barHeight = Math.max(8, Math.round((Math.abs(snapshot.netWorth) / maxHistoryValue) * 64));
+                return (
+                  <View
+                    accessibilityLabel={`${formatSnapshotMonth(snapshot.snapshotMonth)} net worth ${formatMoney(snapshot.netWorth, true)}`}
+                    accessible
+                    key={snapshot.snapshotMonth}
+                    style={styles.historyColumn}
+                  >
+                    <View style={styles.historyBarTrack}>
+                      <View
+                        style={[
+                          styles.historyBar,
+                          { height: barHeight },
+                          snapshot.netWorth < 0 && styles.historyBarNegative,
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.historyMonth}>{formatSnapshotMonth(snapshot.snapshotMonth)}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={styles.historyEmpty}>
+              <View style={styles.historyEmptyIcon}>
+                <MaterialCommunityIcons color={colors.primaryDark} name="chart-timeline-variant" size={21} />
+              </View>
+              <View style={styles.historyEmptyCopy}>
+                <Text style={styles.historyEmptyTitle}>History starts this month</Text>
+                <Text style={styles.historyEmptyText}>Zenify will keep one checkpoint when your connected balances refresh.</Text>
+              </View>
+            </View>
+          )}
+          <Text style={styles.historyNote}>Private to your account · Up to 12 months saved</Text>
         </View>
       ) : null}
 
@@ -216,6 +270,25 @@ const styles = StyleSheet.create({
   metricValue: { color: colors.white, fontSize: 15, fontWeight: '800' },
   metricDivider: { backgroundColor: '#FFFFFF1F', marginHorizontal: spacing.md, width: StyleSheet.hairlineWidth },
   netWorthNote: { color: '#93A49A', fontSize: 10 },
+  historyCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.lg, borderWidth: 1, gap: spacing.lg, padding: spacing.lg },
+  historyHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: spacing.md, justifyContent: 'space-between' },
+  historyTitleGroup: { flex: 1, gap: 3 },
+  historyTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
+  historyDetail: { color: colors.inkMuted, fontSize: 11, lineHeight: 16 },
+  historyChange: { color: '#2E7D4F', fontSize: 11, fontWeight: '800', paddingTop: 2 },
+  historyChangeNegative: { color: colors.danger },
+  historyChart: { alignItems: 'flex-end', flexDirection: 'row', gap: spacing.sm, height: 92 },
+  historyColumn: { alignItems: 'center', flex: 1, gap: 6 },
+  historyBarTrack: { alignItems: 'center', flex: 1, justifyContent: 'flex-end', width: '100%' },
+  historyBar: { backgroundColor: '#7BCB98', borderRadius: radius.sm, minWidth: 18, width: '58%' },
+  historyBarNegative: { backgroundColor: '#E69A9A' },
+  historyMonth: { color: colors.inkMuted, fontSize: 10, fontWeight: '700' },
+  historyEmpty: { alignItems: 'center', backgroundColor: colors.surfaceMuted, borderRadius: radius.md, flexDirection: 'row', gap: spacing.md, padding: spacing.md },
+  historyEmptyIcon: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.sm, height: 40, justifyContent: 'center', width: 40 },
+  historyEmptyCopy: { flex: 1, gap: 2 },
+  historyEmptyTitle: { color: colors.ink, fontSize: 13, fontWeight: '800' },
+  historyEmptyText: { color: colors.inkMuted, fontSize: 11, lineHeight: 16 },
+  historyNote: { color: colors.inkMuted, fontSize: 10 },
   connectMoreCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, padding: spacing.lg },
   connectMoreCopy: { alignItems: 'center', flexDirection: 'row', gap: spacing.md },
   connectMoreIcon: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.md, height: 44, justifyContent: 'center', width: 44 },

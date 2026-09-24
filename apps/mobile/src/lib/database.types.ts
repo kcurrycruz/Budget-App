@@ -476,6 +476,47 @@ export type Database = {
         }
         Relationships: []
       }
+      net_worth_snapshots: {
+        Row: {
+          assets: number
+          created_at: string
+          debts: number
+          id: string
+          net_worth: number | null
+          snapshot_month: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assets?: number
+          created_at?: string
+          debts?: number
+          id?: string
+          net_worth?: number | null
+          snapshot_month: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          assets?: number
+          created_at?: string
+          debts?: number
+          id?: string
+          net_worth?: number | null
+          snapshot_month?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "net_worth_snapshots_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recurring_bill_payments: {
         Row: {
           created_at: string

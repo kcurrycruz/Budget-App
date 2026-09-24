@@ -1,8 +1,9 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
 
 import { supabase } from '../lib/supabase';
-import type { Account, Category, CategoryDraft, ImportedTransactionDraft, ManualTransactionDraft, MerchantRule, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalContribution, SavingsGoalContributionDraft, SavingsGoalDraft, SpendingGroup, SubscriptionSuggestion, Transaction } from '../types';
+import type { Account, Category, CategoryDraft, ImportedTransactionDraft, ManualTransactionDraft, MerchantRule, NetWorthSnapshot, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalContribution, SavingsGoalContributionDraft, SavingsGoalDraft, SpendingGroup, SubscriptionSuggestion, Transaction } from '../types';
 import { currentMonthStart, formatActivityDate, parseDateOnly, shiftMonth, toDateOnly } from '../utils/date';
+import { summarizeNetWorth } from '../utils/netWorth';
 
 export type CloudBudgetData = {
   accounts: Account[];
@@ -11,6 +12,7 @@ export type CloudBudgetData = {
   categories: Category[];
   income: number;
   merchantRules: MerchantRule[];
+  netWorthHistory: NetWorthSnapshot[];
   plannedExpenses: PlannedExpense[];
   previousPlanAvailable: boolean;
   previousMonthToDateSpent: number;
@@ -46,6 +48,13 @@ type AccountRow = {
   connection_status: string;
   plaid_item_id: string | null;
   last_synced_at: string | null;
+};
+
+type NetWorthSnapshotRow = {
+  assets: number | string;
+  debts: number | string;
+  net_worth: number | string;
+  snapshot_month: string;
 };
 
 type TransactionRow = {
@@ -360,6 +369,32 @@ export async function loadCloudBudget(monthStart = currentMonthStart()): Promise
     syncedAt: account.last_synced_at ? new Date(account.last_synced_at).toLocaleString() : 'Not synced yet',
   }));
 
+  if (accounts.length > 0) {
+    const { assets, debts } = summarizeNetWorth(accounts);
+    const { error: snapshotError } = await client.from('net_worth_snapshots').upsert({
+      snapshot_month: currentMonthStart(),
+      assets,
+      debts,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,snapshot_month' });
+    if (snapshotError) throw snapshotError;
+  }
+
+  const { data: netWorthHistoryData, error: netWorthHistoryError } = await client
+    .from('net_worth_snapshots')
+    .select('snapshot_month, assets, debts, net_worth')
+    .order('snapshot_month', { ascending: false })
+    .limit(12);
+  if (netWorthHistoryError) throw netWorthHistoryError;
+  const netWorthHistory = ((netWorthHistoryData ?? []) as NetWorthSnapshotRow[])
+    .map((snapshot) => ({
+      assets: Number(snapshot.assets),
+      debts: Number(snapshot.debts),
+      netWorth: Number(snapshot.net_worth),
+      snapshotMonth: snapshot.snapshot_month,
+    }))
+    .reverse();
+
   const transactions: Transaction[] = transactionRows.map((transaction) => ({
     id: transaction.id,
     merchant: transaction.merchant_name,
@@ -399,6 +434,7 @@ export async function loadCloudBudget(monthStart = currentMonthStart()): Promise
     categories,
     income: Number(monthResult.data?.expected_income ?? 0),
     merchantRules: merchantRuleRows.map(mapMerchantRule),
+    netWorthHistory,
     plannedExpenses: plannedExpenseRows.map(mapPlannedExpense),
     previousPlanAvailable,
     previousMonthToDateSpent,
