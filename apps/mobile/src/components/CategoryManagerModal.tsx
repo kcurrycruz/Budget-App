@@ -1,6 +1,6 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { colors, radius, spacing } from '../theme';
 import type { Category, CategoryDraft, SpendingGroup, Subcategory } from '../types';
@@ -14,14 +14,18 @@ const spendingGroups: { detail: string; icon: keyof typeof MaterialCommunityIcon
 ];
 
 type Props = {
+  archivedCategories: Category[];
   categories: Category[];
   visible: boolean;
+  onArchiveCategory: (category: Category) => Promise<void>;
   onClose: () => void;
+  onMoveCategory: (category: Category, direction: -1 | 1) => Promise<void>;
+  onRestoreCategory: (category: Category) => Promise<void>;
   onSaveCategory: (category: Category | null, draft: CategoryDraft) => Promise<void>;
   onSaveSubcategory: (categoryId: string, name: string, subcategory?: Subcategory) => Promise<void>;
 };
 
-export function CategoryManagerModal({ categories, visible, onClose, onSaveCategory, onSaveSubcategory }: Props) {
+export function CategoryManagerModal({ archivedCategories, categories, visible, onArchiveCategory, onClose, onMoveCategory, onRestoreCategory, onSaveCategory, onSaveSubcategory }: Props) {
   const [editing, setEditing] = useState<Category | null | undefined>(undefined);
   const [name, setName] = useState('');
   const [color, setColor] = useState<string>(colorOptions[0]!);
@@ -79,6 +83,54 @@ export function CategoryManagerModal({ categories, visible, onClose, onSaveCateg
     }
   };
 
+  const moveCategory = async (category: Category, direction: -1 | 1) => {
+    setSaving(true);
+    setError('');
+    try {
+      await onMoveCategory(category, direction);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not reorder your categories.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const performArchiveCategory = async (category: Category) => {
+    setSaving(true);
+    setError('');
+    try {
+      await onArchiveCategory(category);
+      setEditing(undefined);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not archive this category.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confirmArchiveCategory = (category: Category) => {
+    Alert.alert(
+      `Archive ${category.name}?`,
+      'It will leave your plan and new transaction choices. Existing transactions stay in your history.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Archive', style: 'destructive', onPress: () => { void performArchiveCategory(category); } },
+      ],
+    );
+  };
+
+  const restoreCategory = async (category: Category) => {
+    setSaving(true);
+    setError('');
+    try {
+      await onRestoreCategory(category);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not restore this category.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const currentCategory = editing ? categories.find((item) => item.id === editing.id) ?? editing : editing;
 
   return (
@@ -96,20 +148,32 @@ export function CategoryManagerModal({ categories, visible, onClose, onSaveCateg
           {editing === undefined ? <>
             <View style={styles.intro}>
               <MaterialCommunityIcons color={colors.primaryDark} name="shape-outline" size={22} />
-              <Text style={styles.introText}>Keep the main groups broad. Add subcategories only when the extra detail helps.</Text>
+              <Text style={styles.introText}>Use the arrows to set your plan order. Open a category to edit details, add subcategories, or archive it.</Text>
             </View>
             <View style={styles.list}>
               {categories.map((category, index) => <View key={category.id}>
-                <Pressable onPress={() => openEditor(category)} style={styles.row}>
-                  <View style={[styles.iconBox, { backgroundColor: `${category.color}1A` }]}>
-                    <MaterialCommunityIcons color={category.color} name={category.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={22} />
+                <View style={styles.row}>
+                  <Pressable accessibilityLabel={`Edit ${category.name}`} onPress={() => openEditor(category)} style={styles.rowMain}>
+                    <View style={[styles.iconBox, { backgroundColor: `${category.color}1A` }]}>
+                      <MaterialCommunityIcons color={category.color} name={category.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={22} />
+                    </View>
+                    <View style={styles.rowCopy}>
+                      <Text style={styles.rowTitle}>{category.name}</Text>
+                      <Text numberOfLines={1} style={styles.rowDetail}>{spendingGroups.find((group) => group.id === category.spendingGroup)?.label ?? 'Needs'} · {category.subcategories.length ? category.subcategories.map((item) => item.name).join(' · ') : 'No subcategories'}</Text>
+                    </View>
+                  </Pressable>
+                  <View style={styles.reorderActions}>
+                    <Pressable accessibilityLabel={`Move ${category.name} up`} disabled={saving || index === 0} onPress={() => { void moveCategory(category, -1); }} style={[styles.orderButton, index === 0 && styles.orderButtonDisabled]}>
+                      <MaterialCommunityIcons color={colors.inkMuted} name="chevron-up" size={20} />
+                    </Pressable>
+                    <Pressable accessibilityLabel={`Move ${category.name} down`} disabled={saving || index === categories.length - 1} onPress={() => { void moveCategory(category, 1); }} style={[styles.orderButton, index === categories.length - 1 && styles.orderButtonDisabled]}>
+                      <MaterialCommunityIcons color={colors.inkMuted} name="chevron-down" size={20} />
+                    </Pressable>
                   </View>
-                  <View style={styles.rowCopy}>
-                    <Text style={styles.rowTitle}>{category.name}</Text>
-                    <Text style={styles.rowDetail}>{spendingGroups.find((group) => group.id === category.spendingGroup)?.label ?? 'Needs'} · {category.subcategories.length ? category.subcategories.map((item) => item.name).join(' · ') : 'No subcategories'}</Text>
-                  </View>
-                  <MaterialCommunityIcons color={colors.inkMuted} name="chevron-right" size={21} />
-                </Pressable>
+                  <Pressable accessibilityLabel={`Edit ${category.name}`} onPress={() => openEditor(category)} style={styles.editCategoryButton}>
+                    <MaterialCommunityIcons color={colors.inkMuted} name="chevron-right" size={21} />
+                  </Pressable>
+                </View>
                 {index < categories.length - 1 ? <View style={styles.divider} /> : null}
               </View>)}
             </View>
@@ -117,6 +181,26 @@ export function CategoryManagerModal({ categories, visible, onClose, onSaveCateg
               <MaterialCommunityIcons color={colors.white} name="plus" size={20} />
               <Text style={styles.primaryButtonText}>Add category</Text>
             </Pressable>
+            {archivedCategories.length ? <View style={styles.archivedSection}>
+              <View>
+                <Text style={styles.archivedTitle}>Archived</Text>
+                <Text style={styles.archivedDetail}>Hidden from your plan and new transactions.</Text>
+              </View>
+              <View style={styles.archivedList}>
+                {archivedCategories.map((category, index) => <View key={category.id}>
+                  <View style={styles.archivedRow}>
+                    <View style={[styles.archivedIcon, { backgroundColor: `${category.color}1A` }]}>
+                      <MaterialCommunityIcons color={category.color} name={category.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={19} />
+                    </View>
+                    <Text numberOfLines={1} style={styles.archivedName}>{category.name}</Text>
+                    <Pressable accessibilityLabel={`Restore ${category.name}`} disabled={saving} onPress={() => { void restoreCategory(category); }} style={styles.restoreButton}>
+                      <Text style={styles.restoreText}>Restore</Text>
+                    </Pressable>
+                  </View>
+                  {index < archivedCategories.length - 1 ? <View style={styles.archivedDivider} /> : null}
+                </View>)}
+              </View>
+            </View> : null}
           </> : <>
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Category name</Text>
@@ -165,6 +249,13 @@ export function CategoryManagerModal({ categories, visible, onClose, onSaveCateg
               </View>
               {subcategory ? <Pressable onPress={() => { setSubcategory(undefined); setSubcategoryName(''); }}><Text style={styles.cancelEdit}>Cancel rename</Text></Pressable> : null}
             </View> : null}
+            {currentCategory ? <View style={styles.archiveBlock}>
+              <Pressable disabled={saving || categories.length <= 1} onPress={() => confirmArchiveCategory(currentCategory)} style={[styles.archiveButton, categories.length <= 1 && styles.disabled]}>
+                <MaterialCommunityIcons color={colors.danger} name="archive-arrow-down-outline" size={19} />
+                <Text style={styles.archiveText}>Archive category</Text>
+              </Pressable>
+              {categories.length <= 1 ? <Text style={styles.archiveHint}>Zenify needs at least one active category.</Text> : null}
+            </View> : null}
           </>}
           {error ? <Text style={styles.error}>{error.includes('duplicate') ? 'That name is already in use.' : error}</Text> : null}
         </ScrollView>
@@ -183,11 +274,16 @@ const styles = StyleSheet.create({
   intro: { alignItems: 'flex-start', backgroundColor: colors.primarySoft, borderRadius: radius.md, flexDirection: 'row', gap: spacing.md, padding: spacing.lg },
   introText: { color: colors.primaryDark, flex: 1, fontSize: 13, lineHeight: 19 },
   list: { backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.lg },
-  row: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.lg },
+  row: { alignItems: 'center', flexDirection: 'row', paddingVertical: spacing.md },
+  rowMain: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: spacing.md, minWidth: 0 },
   iconBox: { alignItems: 'center', borderRadius: radius.md, height: 44, justifyContent: 'center', width: 44 },
   rowCopy: { flex: 1, gap: 3 },
   rowTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' },
   rowDetail: { color: colors.inkMuted, fontSize: 11, lineHeight: 16 },
+  reorderActions: { gap: 2, marginLeft: spacing.xs },
+  orderButton: { alignItems: 'center', height: 28, justifyContent: 'center', width: 30 },
+  orderButtonDisabled: { opacity: 0.2 },
+  editCategoryButton: { alignItems: 'center', height: 44, justifyContent: 'center', width: 30 },
   divider: { backgroundColor: colors.border, height: StyleSheet.hairlineWidth, marginLeft: 56 },
   fieldGroup: { gap: spacing.sm },
   label: { color: colors.ink, fontSize: 13, fontWeight: '800' },
@@ -207,6 +303,16 @@ const styles = StyleSheet.create({
   groupDetail: { color: colors.inkMuted, fontSize: 10, lineHeight: 14 },
   primaryButton: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: radius.md, flexDirection: 'row', gap: spacing.sm, justifyContent: 'center', minHeight: 52, paddingHorizontal: spacing.lg },
   primaryButtonText: { color: colors.white, fontSize: 15, fontWeight: '800' },
+  archivedSection: { gap: spacing.md },
+  archivedTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' },
+  archivedDetail: { color: colors.inkMuted, fontSize: 11, marginTop: 3 },
+  archivedList: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: spacing.md },
+  archivedRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, minHeight: 58, paddingVertical: spacing.sm },
+  archivedIcon: { alignItems: 'center', borderRadius: radius.sm, height: 36, justifyContent: 'center', width: 36 },
+  archivedName: { color: colors.inkMuted, flex: 1, fontSize: 13, fontWeight: '700' },
+  restoreButton: { backgroundColor: colors.primarySoft, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 8 },
+  restoreText: { color: colors.primaryDark, fontSize: 11, fontWeight: '800' },
+  archivedDivider: { backgroundColor: colors.border, height: StyleSheet.hairlineWidth, marginLeft: 44 },
   disabled: { opacity: 0.35 },
   subcategoryCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, gap: spacing.md, padding: spacing.lg },
   subcategoryTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' },
@@ -218,5 +324,9 @@ const styles = StyleSheet.create({
   addButton: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.sm, justifyContent: 'center', paddingHorizontal: spacing.lg },
   addButtonText: { color: colors.primaryDark, fontSize: 13, fontWeight: '800' },
   cancelEdit: { color: colors.inkMuted, fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  archiveBlock: { alignItems: 'center', gap: spacing.sm },
+  archiveButton: { alignItems: 'center', borderColor: `${colors.danger}55`, borderRadius: radius.md, borderWidth: 1, flexDirection: 'row', gap: spacing.sm, justifyContent: 'center', minHeight: 48, width: '100%' },
+  archiveText: { color: colors.danger, fontSize: 13, fontWeight: '800' },
+  archiveHint: { color: colors.inkMuted, fontSize: 11 },
   error: { color: colors.danger, fontSize: 12, textAlign: 'center' },
 });

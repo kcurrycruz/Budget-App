@@ -56,7 +56,7 @@ The app will cover the thread's requests through progressive disclosure: the def
 
 ### Next — customization without clutter
 
-- Let users reorder and archive categories. Creating, renaming, and choosing colors/icons is now available.
+- Category organization is now complete: users can create, rename, recolor, reorder, archive, and restore categories without deleting transaction history.
 - Optional subcategories are now available for people who want granularity; broad categories remain the default.
 - Add reusable merchant rules so corrected transactions stay categorized the user's way.
 - Planned one-time expenses are now available alongside recurring bills, with a target month, optional category, suggested monthly set-aside, and covered state.
@@ -130,3 +130,4 @@ Record decisions here with the date, decision, and reason. Move longer technical
 - 2026-09-23: Account settings includes a CSV round-trip for transactions. Zenify validates required fields, skips exact duplicates, limits each import to 500 rows, and sends unknown expense categories to the Review queue instead of guessing.
 - 2026-09-24: Home shows a compact monthly-insights card only when spending exists. It prioritizes overspending, month-to-month direction, and the largest category while keeping deeper analysis inside the cash-flow report.
 - 2026-09-24: Subscription detection only suggests merchants with at least two stable charges 20–40 days apart. Zenify never creates a recurring bill automatically; the user reviews every suggestion, and dismissed suggestions remain private to that account.
+- 2026-09-24: Category order persists privately across devices. Archiving is a reversible soft hide that removes a category from plans and new entries while preserving its label on historical Activity; at least one active category is always required.

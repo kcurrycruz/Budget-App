@@ -6,6 +6,7 @@ import { currentMonthStart, formatActivityDate, parseDateOnly, shiftMonth, toDat
 
 export type CloudBudgetData = {
   accounts: Account[];
+  archivedCategories: Category[];
   bills: number;
   categories: Category[];
   income: number;
@@ -20,11 +21,13 @@ export type CloudBudgetData = {
 };
 
 type CategoryRow = {
+  archived_at: string | null;
   id: string;
   name: string;
   color: string;
   icon: string;
   monthly_limit: number | string;
+  sort_order: number;
   spending_group: SpendingGroup;
 };
 
@@ -266,7 +269,7 @@ export async function loadCloudBudget(monthStart = currentMonthStart()): Promise
   const [monthResult, previousMonthResult, categoriesResult, categoryBudgetsResult, previousCategoryBudgetsResult, subcategoriesResult, accountsResult, transactionsResult, previousTransactionsResult, billsResult, billPaymentsResult, merchantRulesResult, plannedExpensesResult, savingsGoalsResult, savingsGoalContributionsResult, subscriptionHistoryResult, subscriptionDismissalsResult] = await Promise.all([
     client.from('budget_months').select('expected_income, fixed_costs').eq('month', start).maybeSingle(),
     client.from('budget_months').select('expected_income, fixed_costs').eq('month', previousStart).maybeSingle(),
-    client.from('categories').select('id, name, color, icon, monthly_limit, spending_group').is('archived_at', null).order('sort_order'),
+    client.from('categories').select('id, name, color, icon, monthly_limit, spending_group, sort_order, archived_at').order('sort_order').order('name'),
     client.from('category_month_budgets').select('category_id, monthly_limit').eq('month', start),
     client.from('category_month_budgets').select('monthly_limit').eq('month', previousStart),
     client.from('subcategories').select('id, category_id, name').is('archived_at', null).order('sort_order').order('name'),
@@ -326,7 +329,7 @@ export async function loadCloudBudget(monthStart = currentMonthStart()): Promise
     spending.set(transaction.category_id, (spending.get(transaction.category_id) ?? 0) + Number(transaction.amount));
   }
 
-  const categories: Category[] = categoryRows.map((category) => ({
+  const allCategories = categoryRows.map((category) => ({
     id: category.id,
     name: category.name,
     color: category.color,
@@ -340,6 +343,8 @@ export async function loadCloudBudget(monthStart = currentMonthStart()): Promise
       name: subcategory.name,
     })),
   }));
+  const categories = allCategories.filter((_, index) => categoryRows[index]?.archived_at === null);
+  const archivedCategories = allCategories.filter((_, index) => categoryRows[index]?.archived_at !== null);
 
   const accounts: Account[] = accountRows.map((account) => ({
     id: account.id,
@@ -389,6 +394,7 @@ export async function loadCloudBudget(monthStart = currentMonthStart()): Promise
 
   return {
     accounts,
+    archivedCategories,
     bills: Number(monthResult.data?.fixed_costs ?? 0),
     categories,
     income: Number(monthResult.data?.expected_income ?? 0),
@@ -807,6 +813,48 @@ export async function updateCategory(categoryId: string, draft: CategoryDraft) {
   }).eq('id', categoryId).select('id, name, color, icon, spending_group').single();
   if (error) throw error;
   return data;
+}
+
+export async function reorderCategories(categoryIds: string[]) {
+  const client = requireClient();
+  const updatedAt = new Date().toISOString();
+  const results = await Promise.all(categoryIds.map((categoryId, index) => (
+    client.from('categories')
+      .update({ sort_order: (index + 1) * 10, updated_at: updatedAt })
+      .eq('id', categoryId)
+      .select('id')
+      .single()
+  )));
+  const error = results.find((result) => result.error)?.error;
+  if (error) throw error;
+}
+
+export async function archiveCategory(categoryId: string) {
+  const client = requireClient();
+  const timestamp = new Date().toISOString();
+  const { data, error } = await client.from('categories')
+    .update({ archived_at: timestamp, updated_at: timestamp })
+    .eq('id', categoryId)
+    .select('id')
+    .single();
+  if (error) throw error;
+  if (!data?.id) throw new Error('The category could not be archived.');
+
+  const { error: rulesError } = await client.from('merchant_rules')
+    .update({ active: false, updated_at: timestamp })
+    .eq('category_id', categoryId);
+  if (rulesError) throw rulesError;
+}
+
+export async function restoreCategory(categoryId: string, sortOrder: number) {
+  const client = requireClient();
+  const { data, error } = await client.from('categories')
+    .update({ archived_at: null, sort_order: sortOrder, updated_at: new Date().toISOString() })
+    .eq('id', categoryId)
+    .select('id')
+    .single();
+  if (error) throw error;
+  if (!data?.id) throw new Error('The category could not be restored.');
 }
 
 export async function createSubcategory(categoryId: string, name: string, sortOrder: number) {

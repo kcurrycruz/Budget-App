@@ -15,6 +15,7 @@ import { ReviewTransactionModal } from './src/components/ReviewTransactionModal'
 import { SavingsGoalModal } from './src/components/SavingsGoalModal';
 import {
   categorizeTransaction,
+  archiveCategory as archiveBudgetCategory,
   copyPreviousMonthPlan,
   createCategory as createBudgetCategory,
   createManualTransaction,
@@ -34,6 +35,8 @@ import {
   importManualTransactions,
   loadCloudBudget,
   loadMerchantRules,
+  reorderCategories,
+  restoreCategory as restoreBudgetCategory,
   saveMonthlyPlan,
   setPlannedExpenseCovered,
   setRecurringBillPaid,
@@ -146,6 +149,7 @@ function BudgetApp({ session }: BudgetAppProps) {
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>(cloudMode ? [] : initialTransactions);
   const [categories, setCategories] = useState(cloudMode ? [] : initialCategories);
+  const [archivedCategories, setArchivedCategories] = useState<Category[]>([]);
   const [connectedAccounts, setConnectedAccounts] = useState(cloudMode ? [] : accounts);
   const [income, setIncome] = useState(cloudMode ? 0 : monthlyIncome);
   const [bills, setBills] = useState(cloudMode ? 0 : monthlyBills);
@@ -197,6 +201,7 @@ function BudgetApp({ session }: BudgetAppProps) {
       const data = await loadCloudBudget(selectedMonth);
       setTransactions(data.transactions);
       setCategories(data.categories);
+      setArchivedCategories(data.archivedCategories);
       setConnectedAccounts(data.accounts);
       setIncome(data.income);
       setBills(data.bills);
@@ -750,6 +755,32 @@ function BudgetApp({ session }: BudgetAppProps) {
       : category));
   };
 
+  const moveCategory = async (category: Category, direction: -1 | 1) => {
+    const currentIndex = categories.findIndex((item) => item.id === category.id);
+    const nextIndex = currentIndex + direction;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= categories.length) return;
+    const reordered = [...categories];
+    const [moved] = reordered.splice(currentIndex, 1);
+    if (!moved) return;
+    reordered.splice(nextIndex, 0, moved);
+    if (session) await reorderCategories(reordered.map((item) => item.id));
+    setCategories(reordered);
+  };
+
+  const archiveCategory = async (category: Category) => {
+    if (categories.length <= 1) throw new Error('Keep at least one active category.');
+    if (session) await archiveBudgetCategory(category.id);
+    setCategories((current) => current.filter((item) => item.id !== category.id));
+    setArchivedCategories((current) => [...current, category].sort((left, right) => left.name.localeCompare(right.name)));
+    setMerchantRules((current) => current.filter((rule) => rule.categoryId !== category.id));
+  };
+
+  const restoreCategory = async (category: Category) => {
+    if (session) await restoreBudgetCategory(category.id, (categories.length + 1) * 10);
+    setArchivedCategories((current) => current.filter((item) => item.id !== category.id));
+    setCategories((current) => [...current, category]);
+  };
+
   const email = session?.user.email ?? '';
   const accountName = String(
     session?.user.user_metadata.full_name
@@ -887,7 +918,7 @@ function BudgetApp({ session }: BudgetAppProps) {
       case 'transactions':
         return (
           <TransactionsScreen
-            categories={categories}
+            categories={[...categories, ...archivedCategories]}
             month={selectedMonth}
             onAdd={openTransactionEntry}
             onReview={setReviewTransaction}
@@ -946,6 +977,7 @@ function BudgetApp({ session }: BudgetAppProps) {
             plannedExpenses={plannedExpenses}
             previousMonthSpent={previousMonthToDateSpent}
             transactions={transactions}
+            transactionCategories={[...categories, ...archivedCategories]}
             recurringBills={recurringBills}
             userInitials={userInitials}
             userName={firstName}
@@ -1034,8 +1066,12 @@ function BudgetApp({ session }: BudgetAppProps) {
         visible={monthPickerOpen}
       />
       <CategoryManagerModal
+        archivedCategories={archivedCategories}
         categories={categories}
+        onArchiveCategory={archiveCategory}
         onClose={() => setCategoryManagerOpen(false)}
+        onMoveCategory={moveCategory}
+        onRestoreCategory={restoreCategory}
         onSaveCategory={saveCategory}
         onSaveSubcategory={saveSubcategory}
         visible={categoryManagerOpen}

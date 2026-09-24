@@ -13,6 +13,7 @@ import { formatMoney } from '../utils/money';
 
 type HomeScreenProps = {
   categories: Category[];
+  transactionCategories?: Category[];
   transactions: Transaction[];
   income: number;
   month: string;
@@ -34,6 +35,7 @@ type HomeScreenProps = {
 
 export function HomeScreen({
   categories,
+  transactionCategories = categories,
   transactions,
   income,
   month,
@@ -236,7 +238,7 @@ export function HomeScreen({
         {transactions.slice(0, 4).map((transaction, index) => (
           <View key={transaction.id}>
             <TransactionRow
-              category={categories.find((category) => category.id === transaction.categoryId)}
+              category={transactionCategories.find((category) => category.id === transaction.categoryId)}
               transaction={transaction}
             />
             {index < Math.min(transactions.length, 4) - 1 ? <View style={styles.divider} /> : null}
