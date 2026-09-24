@@ -1,7 +1,7 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
 
 import { supabase } from '../lib/supabase';
-import type { Account, Category, CategoryDraft, ManualTransactionDraft, MerchantRule, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalContribution, SavingsGoalContributionDraft, SavingsGoalDraft, SpendingGroup, Transaction } from '../types';
+import type { Account, Category, CategoryDraft, ImportedTransactionDraft, ManualTransactionDraft, MerchantRule, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalContribution, SavingsGoalContributionDraft, SavingsGoalDraft, SpendingGroup, Transaction } from '../types';
 import { formatActivityDate, toDateOnly } from '../utils/date';
 
 export type CloudBudgetData = {
@@ -574,6 +574,43 @@ export async function createManualTransaction(draft: ManualTransactionDraft) {
     subcategoryId: (data.subcategory_id as string | null) ?? undefined,
     transactionDate: data.transaction_date as string,
   } satisfies Transaction;
+}
+
+export async function importManualTransactions(drafts: ImportedTransactionDraft[]) {
+  if (!drafts.length) return [];
+  const client = requireClient();
+  const { data, error } = await client
+    .from('transactions')
+    .insert(drafts.map((draft) => ({
+      amount: draft.amount,
+      category_id: draft.direction === 'outflow' ? draft.categoryId || null : null,
+      direction: draft.direction,
+      merchant_name: draft.merchant,
+      needs_review: draft.needsReview,
+      note: draft.note || null,
+      source: 'manual',
+      subcategory_id: draft.direction === 'outflow' ? draft.subcategoryId || null : null,
+      transaction_date: draft.transactionDate,
+    })))
+    .select('id, merchant_name, category_id, subcategory_id, amount, direction, needs_review, transaction_date, pending, source, note');
+
+  if (error) throw error;
+
+  return ((data ?? []) as TransactionRow[]).map((transaction) => ({
+    id: transaction.id,
+    merchant: transaction.merchant_name,
+    categoryId: transaction.category_id ?? '',
+    amount: Number(transaction.amount),
+    direction: transaction.direction,
+    needsReview: transaction.needs_review,
+    date: formatActivityDate(transaction.transaction_date),
+    account: 'Manual entry',
+    pending: transaction.pending,
+    source: transaction.source,
+    note: transaction.note ?? undefined,
+    subcategoryId: transaction.subcategory_id ?? undefined,
+    transactionDate: transaction.transaction_date,
+  } satisfies Transaction));
 }
 
 export async function updateManualTransaction(transactionId: string, draft: ManualTransactionDraft) {

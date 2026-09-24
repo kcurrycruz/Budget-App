@@ -28,6 +28,7 @@ import {
   deleteSavingsGoal,
   deleteSavingsGoalContribution,
   exportCloudBudget,
+  importManualTransactions,
   loadCloudBudget,
   loadMerchantRules,
   saveMonthlyPlan,
@@ -52,7 +53,7 @@ import { PlanSetupScreen } from './src/screens/PlanSetupScreen';
 import { TransactionsScreen } from './src/screens/TransactionsScreen';
 import { UpdatePasswordScreen } from './src/screens/UpdatePasswordScreen';
 import { colors } from './src/theme';
-import type { AppTab, Category, CategoryDraft, ManualTransactionDraft, MerchantRule, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalContribution, SavingsGoalContributionDraft, SavingsGoalDraft, Subcategory, Transaction } from './src/types';
+import type { AppTab, Category, CategoryDraft, ImportedTransactionDraft, ManualTransactionDraft, MerchantRule, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalContribution, SavingsGoalContributionDraft, SavingsGoalDraft, Subcategory, Transaction } from './src/types';
 import { formatActivityDate } from './src/utils/date';
 import { formatMoney } from './src/utils/money';
 import { useReducedMotion } from './src/utils/useReducedMotion';
@@ -716,6 +717,36 @@ function BudgetApp({ session }: BudgetAppProps) {
     setMerchantRules((current) => current.filter((rule) => rule.id !== ruleId));
   };
 
+  const importSpreadsheetTransactions = async (drafts: ImportedTransactionDraft[]) => {
+    if (!drafts.length) return 0;
+    const imported = session
+      ? await importManualTransactions(drafts)
+      : drafts.map((draft, index) => ({
+          id: `csv-${Date.now()}-${index}`,
+          merchant: draft.merchant,
+          amount: draft.amount,
+          categoryId: draft.categoryId,
+          subcategoryId: draft.subcategoryId,
+          direction: draft.direction,
+          needsReview: draft.needsReview,
+          date: formatActivityDate(draft.transactionDate),
+          account: 'Manual entry',
+          note: draft.note || undefined,
+          source: 'manual' as const,
+          transactionDate: draft.transactionDate,
+        } satisfies Transaction));
+    setTransactions((current) => [...imported, ...current].sort((a, b) => (
+      (b.transactionDate ?? '').localeCompare(a.transactionDate ?? '')
+    )));
+    setCategories((current) => current.map((category) => ({
+      ...category,
+      spent: category.spent + imported
+        .filter((transaction) => transaction.direction === 'outflow' && transaction.categoryId === category.id)
+        .reduce((sum, transaction) => sum + transaction.amount, 0),
+    })));
+    return imported.length;
+  };
+
   const signOut = async () => {
     if (!supabase) return;
     const { error } = await supabase.auth.signOut();
@@ -774,8 +805,10 @@ function BudgetApp({ session }: BudgetAppProps) {
           onDelete={deleteAccount}
           onDeleteMerchantRule={removeMerchantRule}
           onExport={exportCloudBudget}
+          onImportTransactions={importSpreadsheetTransactions}
           onSignOut={signOut}
           transactionCount={transactions.length}
+          transactions={transactions}
         />
       </SafeAreaView>
     );

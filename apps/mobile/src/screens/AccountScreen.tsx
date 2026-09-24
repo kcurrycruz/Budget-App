@@ -14,8 +14,9 @@ import {
 } from 'react-native';
 
 import { MerchantRulesModal } from '../components/MerchantRulesModal';
+import { SpreadsheetDataModal } from '../components/SpreadsheetDataModal';
 import { colors, radius, shadow, spacing } from '../theme';
-import type { Category, MerchantRule } from '../types';
+import type { Category, ImportedTransactionDraft, MerchantRule, Transaction } from '../types';
 
 type AccountScreenProps = {
   accountCount: number;
@@ -27,8 +28,10 @@ type AccountScreenProps = {
   onDelete: () => Promise<void>;
   onDeleteMerchantRule: (ruleId: string) => Promise<void>;
   onExport: () => Promise<string>;
+  onImportTransactions: (drafts: ImportedTransactionDraft[]) => Promise<number>;
   onSignOut: () => Promise<void>;
   transactionCount: number;
+  transactions: Transaction[];
 };
 
 export function AccountScreen({
@@ -41,8 +44,10 @@ export function AccountScreen({
   onDelete,
   onDeleteMerchantRule,
   onExport,
+  onImportTransactions,
   onSignOut,
   transactionCount,
+  transactions,
 }: AccountScreenProps) {
   const [exporting, setExporting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -50,6 +55,7 @@ export function AccountScreen({
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [spreadsheetOpen, setSpreadsheetOpen] = useState(false);
   const initials = fullName
     ? fullName.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()
     : email.slice(0, 2).toUpperCase();
@@ -128,6 +134,13 @@ export function AccountScreen({
         />
         <View style={styles.divider} />
         <MenuRow
+          detail="Import or export this month’s transactions as CSV."
+          icon="file-table-outline"
+          label="Spreadsheet data"
+          onPress={() => setSpreadsheetOpen(true)}
+        />
+        <View style={styles.divider} />
+        <MenuRow
           detail="Share a readable JSON copy of your budget."
           icon="download-outline"
           label="Export my data"
@@ -161,6 +174,14 @@ export function AccountScreen({
         onDelete={onDeleteMerchantRule}
         rules={merchantRules}
         visible={rulesOpen}
+      />
+
+      <SpreadsheetDataModal
+        categories={categories}
+        onClose={() => setSpreadsheetOpen(false)}
+        onImport={onImportTransactions}
+        transactions={transactions}
+        visible={spreadsheetOpen}
       />
 
       <Modal animationType="slide" onRequestClose={closeDelete} presentationStyle="pageSheet" visible={deleteOpen}>

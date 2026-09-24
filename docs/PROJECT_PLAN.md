@@ -67,7 +67,7 @@ The app will cover the thread's requests through progressive disclosure: the def
 - A simple cash-flow report is now available inside Plan, combining expected and received income, actual spending, one-time set-asides, budget totals, and remaining availability.
 - Month-to-date spending now includes a comparison with the same point last month plus editable Needs, Wants, and Savings percentage views.
 - Savings goals now include dated contribution history inside Plan, alongside progress, target dates, and a suggested monthly pace. Accounts now includes a connected-balance net-worth snapshot. Add sinking-fund automation and net-worth history without putting them on the primary Home screen.
-- Add spreadsheet/CSV import and export so users retain control of their data.
+- Spreadsheet data is now portable from Account settings: users can export the current month as a clean CSV and preview validated CSV rows before importing them. Add flexible column mapping and full-history exports later.
 
 ### Later — households and power tools
 
@@ -127,3 +127,4 @@ Record decisions here with the date, decision, and reason. Move longer technical
 - 2026-09-23: Primary tab changes use a short directional fade-and-slide plus a small selected-icon lift. The motion remains subtle, preserves the stable four-tab layout, and respects the device’s Reduce Motion preference.
 - 2026-09-23: Savings-goal deposits are stored as private dated contribution records. The original saved amount remains a starting balance, contribution totals are calculated on read, and deleting a contribution reverses only that entry without rewriting the goal’s history.
 - 2026-09-23: Accounts shows an estimated net worth from connected balances only. Cash and investment accounts count toward assets, credit and loan balances count toward debt, and negative cash balances are treated as debt so the summary remains conservative.
+- 2026-09-23: Account settings includes a CSV round-trip for transactions. Zenify validates required fields, skips exact duplicates, limits each import to 500 rows, and sends unknown expense categories to the Review queue instead of guessing.

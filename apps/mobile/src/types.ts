@@ -50,6 +50,10 @@ export type ManualTransactionDraft = {
   transactionDate: string;
 };
 
+export type ImportedTransactionDraft = ManualTransactionDraft & {
+  needsReview: boolean;
+};
+
 export type MerchantRule = {
   id: string;
   merchantName: string;
