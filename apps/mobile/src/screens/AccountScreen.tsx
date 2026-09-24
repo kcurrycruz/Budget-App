@@ -2,7 +2,6 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -14,9 +13,11 @@ import {
 } from 'react-native';
 
 import { MerchantRulesModal } from '../components/MerchantRulesModal';
+import { PasskeySettingsModal } from '../components/PasskeySettingsModal';
 import { SpreadsheetDataModal } from '../components/SpreadsheetDataModal';
 import { colors, radius, shadow, spacing } from '../theme';
 import type { Category, ImportedTransactionDraft, MerchantRule, Transaction } from '../types';
+import { showMessage } from '../utils/dialogs';
 
 type AccountScreenProps = {
   accountCount: number;
@@ -55,6 +56,7 @@ export function AccountScreen({
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [passkeysOpen, setPasskeysOpen] = useState(false);
   const [spreadsheetOpen, setSpreadsheetOpen] = useState(false);
   const initials = fullName
     ? fullName.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()
@@ -66,7 +68,7 @@ export function AccountScreen({
       const payload = await onExport();
       await Share.share({ message: payload, title: 'My Zenify data' });
     } catch (caught) {
-      Alert.alert('Export failed', caught instanceof Error ? caught.message : 'Please try again.');
+      showMessage('Export failed', caught instanceof Error ? caught.message : 'Please try again.');
     } finally {
       setExporting(false);
     }
@@ -125,6 +127,13 @@ export function AccountScreen({
 
       <View style={styles.menuCard}>
         <MenuRow
+          detail="Set up or manage a passkey protected by Face ID."
+          icon="face-recognition"
+          label="Face ID sign-in"
+          onPress={() => setPasskeysOpen(true)}
+        />
+        <View style={styles.divider} />
+        <MenuRow
           detail={merchantRules.length === 0
             ? 'Create rules while reviewing bank transactions.'
             : `${merchantRules.length} saved ${merchantRules.length === 1 ? 'rule' : 'rules'} for future transactions.`}
@@ -175,6 +184,8 @@ export function AccountScreen({
         rules={merchantRules}
         visible={rulesOpen}
       />
+
+      <PasskeySettingsModal onClose={() => setPasskeysOpen(false)} visible={passkeysOpen} />
 
       <SpreadsheetDataModal
         categories={categories}

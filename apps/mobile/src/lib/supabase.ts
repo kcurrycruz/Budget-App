@@ -22,6 +22,7 @@ export const supabase = isCloudConfigured
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: Platform.OS === 'web',
+        experimental: { passkey: true },
       },
     })
   : null;

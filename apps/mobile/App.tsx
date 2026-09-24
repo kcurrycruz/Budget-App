@@ -65,6 +65,7 @@ import type { AppTab, Category, CategoryDraft, ImportedTransactionDraft, ManualT
 import { currentMonthStart, formatActivityDate, toDateOnly } from './src/utils/date';
 import { confirmAction, showMessage } from './src/utils/dialogs';
 import { formatMoney } from './src/utils/money';
+import { supportsWebPasskeys, webPasskeyLabel } from './src/utils/passkeys';
 import { useReducedMotion } from './src/utils/useReducedMotion';
 
 const tabOrder: AppTab[] = ['home', 'transactions', 'plan', 'connect'];
@@ -121,6 +122,8 @@ export default function App() {
   const [unlockError, setUnlockError] = useState<string | null>(null);
   const autoUnlockAttempted = useRef(false);
   const unlockInProgress = useRef(false);
+  const webPasskeyAvailable = supportsWebPasskeys();
+  const webBiometricLabel = webPasskeyLabel();
 
   const unlockWithBiometrics = useCallback(async () => {
     if (Platform.OS === 'web' || unlockInProgress.current) return;
@@ -144,6 +147,27 @@ export default function App() {
       }
     } catch {
       setUnlockError('Biometric unlock is unavailable right now. Sign in with your password instead.');
+    } finally {
+      unlockInProgress.current = false;
+      setUnlockBusy(false);
+    }
+  }, []);
+
+  const unlockWithPasskey = useCallback(async () => {
+    if (!supabase || Platform.OS !== 'web' || unlockInProgress.current) return;
+    unlockInProgress.current = true;
+    setUnlockBusy(true);
+    setUnlockError(null);
+    try {
+      const { data, error } = await supabase.auth.signInWithPasskey();
+      if (error) {
+        const cancelled = 'code' in error && error.code === 'ERROR_CEREMONY_ABORTED';
+        if (!cancelled) setUnlockError(error.message || 'Face ID sign-in did not finish. Use your password or try again.');
+        return;
+      }
+      if (data.session) setAppUnlocked(true);
+    } catch (caught) {
+      setUnlockError(caught instanceof Error ? caught.message : 'Face ID sign-in is unavailable. Use your password instead.');
     } finally {
       unlockInProgress.current = false;
       setUnlockBusy(false);
@@ -233,12 +257,12 @@ export default function App() {
   if (isCloudConfigured && session && !appUnlocked) {
     return (
       <AppLockScreen
-        biometricAvailable={biometricAvailable}
-        biometricLabel={biometricLabel}
+        biometricAvailable={Platform.OS === 'web' ? webPasskeyAvailable : biometricAvailable}
+        biometricLabel={Platform.OS === 'web' ? webBiometricLabel : biometricLabel}
         busy={unlockBusy}
         error={unlockError}
         onPasswordSignIn={() => { void usePasswordSignIn(); }}
-        onUnlock={() => { void unlockWithBiometrics(); }}
+        onUnlock={() => { void (Platform.OS === 'web' ? unlockWithPasskey() : unlockWithBiometrics()); }}
       />
     );
   }

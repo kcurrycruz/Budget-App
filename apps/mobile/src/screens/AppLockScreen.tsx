@@ -15,60 +15,63 @@ type AppLockScreenProps = {
 export function AppLockScreen({ biometricAvailable, biometricLabel, busy, error, onPasswordSignIn, onUnlock }: AppLockScreenProps) {
   return (
     <SafeAreaView style={styles.page}>
-      <View style={styles.brandRow}>
-        <Image accessibilityLabel="Zenify logo" source={require('../../assets/zenify-logo.jpg')} style={styles.brandMark} />
-        <View>
-          <Text style={styles.brandName}>Zenify</Text>
-          <Text style={styles.brandLine}>Your finances, protected.</Text>
-        </View>
-      </View>
-
-      <View style={styles.card}>
-        <View style={styles.lockIcon}>
-          <MaterialCommunityIcons color={colors.primaryDark} name={biometricAvailable ? 'face-recognition' : 'shield-lock-outline'} size={34} />
-        </View>
-        <Text style={styles.title}>Welcome back</Text>
-        <Text style={styles.detail}>
-          {biometricAvailable
-            ? `Use ${biometricLabel} to unlock your private budget.`
-            : 'For your security, sign in again before opening your budget.'}
-        </Text>
-
-        {error ? (
-          <View style={styles.errorCard}>
-            <MaterialCommunityIcons color={colors.danger} name="alert-circle-outline" size={19} />
-            <Text style={styles.errorText}>{error}</Text>
+      <View style={styles.shell}>
+        <View style={styles.brandRow}>
+          <Image accessibilityLabel="Zenify logo" source={require('../../assets/zenify-logo.jpg')} style={styles.brandMark} />
+          <View>
+            <Text style={styles.brandName}>Zenify</Text>
+            <Text style={styles.brandLine}>Your finances, protected.</Text>
           </View>
-        ) : null}
+        </View>
 
-        {biometricAvailable ? (
-          <Pressable disabled={busy} onPress={onUnlock} style={[styles.primaryButton, busy && styles.disabled]}>
-            {busy
-              ? <ActivityIndicator color={colors.white} />
-              : <>
-                  <MaterialCommunityIcons color={colors.white} name="face-recognition" size={23} />
-                  <Text style={styles.primaryText}>Unlock with {biometricLabel}</Text>
-                </>}
+        <View style={styles.card}>
+          <View style={styles.lockIcon}>
+            <MaterialCommunityIcons color={colors.primaryDark} name={biometricAvailable ? 'face-recognition' : 'shield-lock-outline'} size={34} />
+          </View>
+          <Text style={styles.title}>Welcome back</Text>
+          <Text style={styles.detail}>
+            {biometricAvailable
+              ? `Use ${biometricLabel} to unlock your private budget.`
+              : 'For your security, sign in again before opening your budget.'}
+          </Text>
+
+          {error ? (
+            <View style={styles.errorCard}>
+              <MaterialCommunityIcons color={colors.danger} name="alert-circle-outline" size={19} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
+          {biometricAvailable ? (
+            <Pressable disabled={busy} onPress={onUnlock} style={[styles.primaryButton, busy && styles.disabled]}>
+              {busy
+                ? <ActivityIndicator color={colors.white} />
+                : <>
+                    <MaterialCommunityIcons color={colors.white} name="face-recognition" size={23} />
+                    <Text style={styles.primaryText}>Unlock with {biometricLabel}</Text>
+                  </>}
+            </Pressable>
+          ) : null}
+
+          <Pressable disabled={busy} onPress={onPasswordSignIn} style={styles.passwordButton}>
+            <MaterialCommunityIcons color={colors.primaryDark} name="form-textbox-password" size={20} />
+            <Text style={styles.passwordText}>Sign in with password</Text>
           </Pressable>
-        ) : null}
+        </View>
 
-        <Pressable disabled={busy} onPress={onPasswordSignIn} style={styles.passwordButton}>
-          <MaterialCommunityIcons color={colors.primaryDark} name="form-textbox-password" size={20} />
-          <Text style={styles.passwordText}>Sign in with password</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.privacyRow}>
-        <MaterialCommunityIcons color={colors.primary} name="shield-check-outline" size={18} />
-        <Text style={styles.privacyText}>Your budget stays hidden until you unlock Zenify.</Text>
+        <View style={styles.privacyRow}>
+          <MaterialCommunityIcons color={colors.primary} name="shield-check-outline" size={18} />
+          <Text style={styles.privacyText}>Your budget stays hidden until you unlock Zenify.</Text>
+        </View>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  page: { backgroundColor: colors.background, flex: 1, gap: spacing.xl, justifyContent: 'center', padding: spacing.xl },
-  brandRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.md },
+  page: { alignItems: 'center', backgroundColor: colors.background, flex: 1, justifyContent: 'center', padding: spacing.lg },
+  shell: { gap: spacing.xl, maxWidth: 440, width: '100%' },
+  brandRow: { alignItems: 'center', alignSelf: 'center', flexDirection: 'row', gap: spacing.md },
   brandMark: { borderRadius: radius.md, height: 56, width: 56 },
   brandName: { color: colors.ink, fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
   brandLine: { color: colors.inkMuted, fontSize: 12, marginTop: 2 },

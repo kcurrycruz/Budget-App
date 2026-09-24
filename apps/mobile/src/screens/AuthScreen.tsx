@@ -15,6 +15,7 @@ import {
 
 import { passwordResetRedirectUrl, supabase } from '../lib/supabase';
 import { colors, radius, shadow, spacing } from '../theme';
+import { supportsWebPasskeys, webPasskeyLabel } from '../utils/passkeys';
 
 type AuthMode = 'reset' | 'signIn' | 'signUp';
 
@@ -28,11 +29,14 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
 
   const isSignUp = mode === 'signUp';
   const isReset = mode === 'reset';
+  const passkeySupported = supportsWebPasskeys();
+  const passkeyLabel = webPasskeyLabel();
   const canSubmit = email.trim().length > 3
     && (isReset || password.length >= 8)
     && (!isSignUp || fullName.trim().length > 1);
@@ -45,7 +49,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   };
 
   const submit = async () => {
-    if (!supabase || !canSubmit || busy) return;
+    if (!supabase || !canSubmit || busy || passkeyBusy) return;
 
     setBusy(true);
     setMessage(null);
@@ -88,45 +92,93 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     }
   };
 
+  const signInWithPasskey = async () => {
+    if (!supabase || !passkeySupported || busy || passkeyBusy) return;
+    setPasskeyBusy(true);
+    setMessage(null);
+    setIsError(false);
+    try {
+      const { data, error } = await supabase.auth.signInWithPasskey();
+      if (error) {
+        const cancelled = 'code' in error && error.code === 'ERROR_CEREMONY_ABORTED';
+        if (!cancelled) {
+          setIsError(true);
+          setMessage(error.message || 'Face ID sign-in did not finish. Use your password or try again.');
+        }
+        return;
+      }
+      if (data.session) onAuthenticated?.();
+    } catch (caught) {
+      setIsError(true);
+      setMessage(caught instanceof Error ? caught.message : 'Face ID sign-in is unavailable. Use your password instead.');
+    } finally {
+      setPasskeyBusy(false);
+    }
+  };
+
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View style={styles.brandRow}>
-          <Image accessibilityLabel="Zenify logo" source={require('../../assets/zenify-logo.jpg')} style={styles.brandMark} />
-          <View>
-            <Text style={styles.brandName}>Zenify</Text>
-            <Text style={styles.brandLine}>Your finances, unified.</Text>
-          </View>
-        </View>
-        <View style={styles.intro}>
-          <Text style={styles.eyebrow}>ONE CLEAR FINANCIAL VIEW</Text>
-          <Text style={styles.title}>
-            {isReset ? 'Reset your password' : isSignUp ? 'Create your private budget' : 'Welcome back'}
-          </Text>
-          <Text style={styles.detail}>
-            {isReset
-              ? 'Enter your email and we’ll send a secure link to choose a new password.'
-              : isSignUp
-              ? 'Your transactions and plans stay separate from every other account.'
-              : 'Sign in to see your budget on any device.'}
-          </Text>
-        </View>
-
-        <View style={styles.card}>
-          {isSignUp ? (
-            <View style={styles.field}>
-              <Text style={styles.label}>Name</Text>
-              <TextInput
-                autoCapitalize="words"
-                autoComplete="name"
-                onChangeText={setFullName}
-                placeholder="Your name"
-                placeholderTextColor={colors.inkMuted}
-                style={styles.input}
-                value={fullName}
-              />
+        <View style={styles.shell}>
+          <View style={styles.brandRow}>
+            <Image accessibilityLabel="Zenify logo" source={require('../../assets/zenify-logo.jpg')} style={styles.brandMark} />
+            <View>
+              <Text style={styles.brandName}>Zenify</Text>
+              <Text style={styles.brandLine}>Your finances, unified.</Text>
             </View>
-          ) : null}
+          </View>
+          <View style={styles.intro}>
+            <Text style={styles.eyebrow}>ONE CLEAR FINANCIAL VIEW</Text>
+            <Text style={styles.title}>
+              {isReset ? 'Reset your password' : isSignUp ? 'Create your private budget' : 'Welcome back'}
+            </Text>
+            <Text style={styles.detail}>
+              {isReset
+                ? 'Enter your email and we’ll send a secure link to choose a new password.'
+                : isSignUp
+                ? 'Your transactions and plans stay separate from every other account.'
+                : passkeySupported
+                ? `Use ${passkeyLabel === 'Face ID' ? 'Face ID' : 'a passkey'} for a quick return, or sign in with your password.`
+                : 'Sign in to see your budget on any device.'}
+            </Text>
+          </View>
+
+          <View style={styles.card}>
+            {!isSignUp && !isReset && passkeySupported ? <>
+              <Pressable
+                accessibilityLabel="Sign in with Face ID or passkey"
+                disabled={busy || passkeyBusy}
+                onPress={() => { void signInWithPasskey(); }}
+                style={[styles.passkeyButton, (busy || passkeyBusy) && styles.buttonDisabled]}
+              >
+                {passkeyBusy
+                  ? <ActivityIndicator color={colors.white} />
+                  : <>
+                    <MaterialCommunityIcons color={colors.white} name="face-recognition" size={23} />
+                    <Text style={styles.passkeyButtonText}>Sign in with {passkeyLabel === 'Face ID' ? 'Face ID' : 'a passkey'}</Text>
+                  </>}
+              </Pressable>
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>OR USE YOUR PASSWORD</Text>
+                <View style={styles.dividerLine} />
+              </View>
+            </> : null}
+
+            {isSignUp ? (
+              <View style={styles.field}>
+                <Text style={styles.label}>Name</Text>
+                <TextInput
+                  autoCapitalize="words"
+                  autoComplete="name"
+                  onChangeText={setFullName}
+                  placeholder="Your name"
+                  placeholderTextColor={colors.inkMuted}
+                  style={styles.input}
+                  value={fullName}
+                />
+              </View>
+            ) : null}
 
           <View style={styles.field}>
             <Text style={styles.label}>Email</Text>
@@ -174,37 +226,38 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
             </View>
           ) : null}
 
-          <Pressable
-            disabled={!canSubmit || busy}
-            onPress={submit}
-            style={[styles.primaryButton, (!canSubmit || busy) && styles.buttonDisabled]}
-          >
-            {busy ? (
-              <ActivityIndicator color={colors.white} />
-            ) : (
-              <Text style={styles.primaryButtonText}>
-                {isReset ? 'Send reset link' : isSignUp ? 'Create account' : 'Sign in'}
+            <Pressable
+              disabled={!canSubmit || busy || passkeyBusy}
+              onPress={submit}
+              style={[styles.primaryButton, (!canSubmit || busy || passkeyBusy) && styles.buttonDisabled]}
+            >
+              {busy ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.primaryButtonText}>
+                  {isReset ? 'Send reset link' : isSignUp ? 'Create account' : 'Sign in with password'}
+                </Text>
+              )}
+            </Pressable>
+          </View>
+
+          {isReset ? (
+            <Pressable onPress={() => changeMode('signIn')} style={styles.switchButton}>
+              <Text style={styles.switchLink}>Back to sign in</Text>
+            </Pressable>
+          ) : (
+            <Pressable onPress={() => changeMode(isSignUp ? 'signIn' : 'signUp')} style={styles.switchButton}>
+              <Text style={styles.switchText}>
+                {isSignUp ? 'Already have an account? ' : 'New here? '}
+                <Text style={styles.switchLink}>{isSignUp ? 'Sign in' : 'Create an account'}</Text>
               </Text>
-            )}
-          </Pressable>
-        </View>
+            </Pressable>
+          )}
 
-        {isReset ? (
-          <Pressable onPress={() => changeMode('signIn')} style={styles.switchButton}>
-            <Text style={styles.switchLink}>Back to sign in</Text>
-          </Pressable>
-        ) : (
-          <Pressable onPress={() => changeMode(isSignUp ? 'signIn' : 'signUp')} style={styles.switchButton}>
-            <Text style={styles.switchText}>
-              {isSignUp ? 'Already have an account? ' : 'New here? '}
-              <Text style={styles.switchLink}>{isSignUp ? 'Sign in' : 'Create an account'}</Text>
-            </Text>
-          </Pressable>
-        )}
-
-        <View style={styles.privacyRow}>
-          <MaterialCommunityIcons color={colors.primary} name="shield-lock-outline" size={18} />
-          <Text style={styles.privacyText}>Private by default. Your financial data is never shared with other users.</Text>
+          <View style={styles.privacyRow}>
+            <MaterialCommunityIcons color={colors.primary} name="shield-lock-outline" size={18} />
+            <Text style={styles.privacyText}>Private by default. Your financial data is never shared with other users.</Text>
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -213,15 +266,16 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
 
 const styles = StyleSheet.create({
   safeArea: { backgroundColor: colors.background, flex: 1 },
-  content: { flexGrow: 1, justifyContent: 'center', padding: spacing.xl, paddingVertical: spacing.xxl, gap: spacing.xl },
-  brandRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.md },
+  content: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.xxl },
+  shell: { alignSelf: 'center', gap: spacing.xl, maxWidth: 440, width: '100%' },
+  brandRow: { alignItems: 'center', alignSelf: 'center', flexDirection: 'row', gap: spacing.md },
   brandMark: { borderRadius: radius.md, height: 56, width: 56 },
   brandName: { color: colors.ink, fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
   brandLine: { color: colors.inkMuted, fontSize: 12, marginTop: 2 },
-  intro: { gap: spacing.sm },
-  eyebrow: { color: colors.primary, fontSize: 12, fontWeight: '800', letterSpacing: 0.8 },
-  title: { color: colors.ink, fontSize: 34, fontWeight: '800', letterSpacing: -1 },
-  detail: { color: colors.inkMuted, fontSize: 15, lineHeight: 22 },
+  intro: { alignItems: 'center', gap: spacing.sm },
+  eyebrow: { color: colors.primary, fontSize: 11, fontWeight: '800', letterSpacing: 0.8, textAlign: 'center' },
+  title: { color: colors.ink, fontSize: 34, fontWeight: '800', letterSpacing: -1, textAlign: 'center' },
+  detail: { color: colors.inkMuted, fontSize: 15, lineHeight: 22, maxWidth: 340, textAlign: 'center' },
   card: { backgroundColor: colors.surface, borderRadius: radius.lg, gap: spacing.lg, padding: spacing.xl, ...shadow },
   field: { gap: spacing.sm },
   label: { color: colors.ink, fontSize: 13, fontWeight: '800' },
@@ -234,6 +288,11 @@ const styles = StyleSheet.create({
   messageText: { color: colors.primaryDark, flex: 1, fontSize: 12, lineHeight: 18 },
   errorText: { color: colors.danger },
   primaryButton: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: radius.md, height: 54, justifyContent: 'center' },
+  passkeyButton: { alignItems: 'center', backgroundColor: colors.ink, borderRadius: radius.md, flexDirection: 'row', gap: spacing.sm, height: 56, justifyContent: 'center' },
+  passkeyButtonText: { color: colors.white, fontSize: 16, fontWeight: '800' },
+  dividerRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },
+  dividerLine: { backgroundColor: colors.border, flex: 1, height: StyleSheet.hairlineWidth },
+  dividerText: { color: colors.inkMuted, fontSize: 9, fontWeight: '800', letterSpacing: 0.6 },
   buttonDisabled: { opacity: 0.4 },
   primaryButtonText: { color: colors.white, fontSize: 16, fontWeight: '800' },
   switchButton: { alignItems: 'center', padding: spacing.sm },

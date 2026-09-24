@@ -52,9 +52,11 @@ The app opens in a standalone window and continues to use the same private Supab
 
 ## App lock and Face ID
 
-Zenify never reveals budget data immediately from a restored session. The installable web app returns to a secure lock screen and requires a password sign-in after launch or backgrounding.
+Zenify never reveals budget data immediately from a restored session. The installable web app returns to a secure lock screen after launch or backgrounding.
 
-Native iOS and Android builds can use the device biometric prompt for faster unlocking. The iOS build includes a Zenify-specific Face ID permission message. Apple Face ID cannot be tested inside Expo Go and is not available to a browser PWA, so it requires a custom native development or production build.
+On Safari and the iPhone Home Screen app, a signed-in user can open **Account → Face ID sign-in** to register a WebAuthn passkey. Future login and unlock prompts can use Face ID through iCloud Keychain, while the password remains available as recovery. The passkey relying-party ID is permanently tied to `kcurry-budget.expo.app`; changing the production hostname requires users to register new passkeys.
+
+This web passkey flow is different from direct native biometric authentication. Native iOS and Android builds can use the device biometric prompt locally; the iOS build already includes a Zenify-specific Face ID permission message. Direct native Face ID cannot be tested inside Expo Go and requires a custom native build.
 
 ## Plaid direction
 
