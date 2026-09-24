@@ -1,6 +1,7 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.116.0';
 
 import { PlaidApiError, plaidPost } from './plaid.ts';
+import { resolvePlaidCategory, type PlaidPersonalFinanceCategory } from './plaidCategorization.ts';
 
 type PlaidAccount = {
   account_id: string;
@@ -19,7 +20,8 @@ type PlaidTransaction = {
   merchant_name: string | null;
   name: string;
   pending: boolean;
-  personal_finance_category: { detailed?: string; primary?: string } | null;
+  pending_transaction_id: string | null;
+  personal_finance_category: PlaidPersonalFinanceCategory | null;
   transaction_id: string;
 };
 
@@ -80,15 +82,6 @@ export async function upsertAccounts(
   })), { onConflict: 'plaid_account_id' });
   if (error) throw error;
 }
-const categoryNameFor = (primary?: string) => {
-  if (!primary) return 'Other';
-  if (['FOOD_AND_DRINK'].includes(primary)) return 'Food';
-  if (['TRANSPORTATION'].includes(primary)) return 'Transport';
-  if (['ENTERTAINMENT'].includes(primary)) return 'Fun';
-  if (['HOME_IMPROVEMENT', 'RENT_AND_UTILITIES'].includes(primary)) return 'Home';
-  return 'Other';
-};
-
 const merchantRuleKey = (merchant: string) => merchant.trim().toLowerCase().replace(/\s+/g, ' ');
 
 export async function syncPlaidItem(
@@ -157,7 +150,13 @@ export async function syncPlaidItem(
     .eq('user_id', item.user_id)
     .is('archived_at', null);
   if (categoryError) throw categoryError;
-  const categoryIds = new Map((categoryRows ?? []).map((category) => [category.name as string, category.id as string]));
+
+  const { data: subcategoryRows, error: subcategoryError } = await admin
+    .from('subcategories')
+    .select('id, category_id, name')
+    .eq('user_id', item.user_id)
+    .is('archived_at', null);
+  if (subcategoryError) throw subcategoryError;
 
   const { data: merchantRuleRows, error: merchantRuleError } = await admin
     .from('merchant_rules')
@@ -172,7 +171,10 @@ export async function syncPlaidItem(
 
   const changed = [...added, ...modified];
   const existing = new Map<string, { category_id: string | null; needs_review: boolean; subcategory_id: string | null }>();
-  for (const batch of chunks(changed.map((transaction) => transaction.transaction_id))) {
+  const priorTransactionIds = changed
+    .flatMap((transaction) => [transaction.transaction_id, transaction.pending_transaction_id])
+    .filter((transactionId): transactionId is string => Boolean(transactionId));
+  for (const batch of chunks([...new Set(priorTransactionIds)])) {
     if (batch.length === 0) continue;
     const { data, error } = await admin
       .from('transactions')
@@ -191,19 +193,35 @@ export async function syncPlaidItem(
 
   const now = new Date().toISOString();
   const records = changed.map((transaction) => {
-    const previous = existing.get(transaction.transaction_id);
+    const previous = existing.get(transaction.transaction_id)
+      ?? (transaction.pending_transaction_id ? existing.get(transaction.pending_transaction_id) : undefined);
     const primary = transaction.personal_finance_category?.primary;
     const direction = transaction.amount >= 0 ? 'outflow' : 'inflow';
     const merchantName = (transaction.merchant_name ?? transaction.name ?? 'Unknown transaction').slice(0, 160);
     const rule = direction === 'outflow' ? merchantRules.get(merchantRuleKey(merchantName)) : undefined;
     const keepReviewedCategory = previous && !previous.needs_review;
+    const plaidCategory = direction === 'outflow'
+      ? resolvePlaidCategory(
+          transaction.personal_finance_category,
+          (categoryRows ?? []).map((category) => ({ id: category.id as string, name: category.name as string })),
+          (subcategoryRows ?? []).map((subcategory) => ({
+            id: subcategory.id as string,
+            category_id: subcategory.category_id as string,
+            name: subcategory.name as string,
+          })),
+        )
+      : { categoryId: null, confident: false, subcategoryId: null };
+    const categoryId = keepReviewedCategory
+      ? previous.category_id
+      : rule?.categoryId ?? plaidCategory.categoryId ?? previous?.category_id ?? null;
+    const subcategoryId = keepReviewedCategory
+      ? previous.subcategory_id
+      : rule?.subcategoryId ?? plaidCategory.subcategoryId ?? previous?.subcategory_id ?? null;
     return {
       user_id: item.user_id,
       financial_account_id: accountIds.get(transaction.account_id) ?? null,
-      category_id: keepReviewedCategory
-        ? previous.category_id
-        : rule?.categoryId ?? previous?.category_id ?? (direction === 'outflow' ? categoryIds.get(categoryNameFor(primary)) ?? null : null),
-      subcategory_id: keepReviewedCategory ? previous.subcategory_id : rule?.subcategoryId ?? previous?.subcategory_id ?? null,
+      category_id: categoryId,
+      subcategory_id: subcategoryId,
       plaid_transaction_id: transaction.transaction_id,
       merchant_name: merchantName,
       amount: Math.abs(Number(transaction.amount)),
@@ -211,15 +229,33 @@ export async function syncPlaidItem(
       transaction_date: transaction.date,
       pending: transaction.pending,
       source: 'plaid',
-      needs_review: keepReviewedCategory ? false : rule ? false : previous?.needs_review ?? true,
+      needs_review: direction === 'inflow'
+        ? false
+        : keepReviewedCategory || rule || (plaidCategory.confident && Boolean(categoryId))
+          ? false
+          : true,
       plaid_category_primary: primary ?? null,
       plaid_category_detailed: transaction.personal_finance_category?.detailed ?? null,
       updated_at: now,
     };
   });
+
   for (const batch of chunks(records)) {
     if (batch.length === 0) continue;
     const { error } = await admin.from('transactions').upsert(batch, { onConflict: 'plaid_transaction_id' });
+    if (error) throw error;
+  }
+
+  const replacedPendingTransactionIds = changed
+    .filter((transaction) => !transaction.pending && transaction.pending_transaction_id)
+    .map((transaction) => transaction.pending_transaction_id as string);
+  for (const batch of chunks([...new Set(replacedPendingTransactionIds)])) {
+    if (batch.length === 0) continue;
+    const { error } = await admin
+      .from('transactions')
+      .delete()
+      .eq('user_id', item.user_id)
+      .in('plaid_transaction_id', batch);
     if (error) throw error;
   }
 
