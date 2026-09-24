@@ -6,20 +6,22 @@ import { ScreenHeader } from '../components/ScreenHeader';
 import { TransactionRow } from '../components/TransactionRow';
 import { colors, radius, spacing } from '../theme';
 import type { Category, Transaction } from '../types';
+import { formatMonth } from '../utils/date';
 import { formatMoney } from '../utils/money';
 
 type TransactionsScreenProps = {
   categories: Category[];
   transactions: Transaction[];
+  month: string;
   onAdd: () => void;
   onReview: (transaction: Transaction) => void;
+  onSelectMonth: () => void;
 };
 
-export function TransactionsScreen({ categories, transactions, onAdd, onReview }: TransactionsScreenProps) {
+export function TransactionsScreen({ categories, transactions, month, onAdd, onReview, onSelectMonth }: TransactionsScreenProps) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'outflow' | 'inflow' | 'review'>('all');
   const reviewCount = transactions.filter((transaction) => transaction.needsReview).length;
-  const monthLabel = new Date().toLocaleDateString('en-US', { month: 'long' });
   const visibleTransactions = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
     return transactions.filter((transaction) => {
@@ -47,6 +49,7 @@ export function TransactionsScreen({ categories, transactions, onAdd, onReview }
     : filter === 'all'
       ? `${net < 0 ? '−' : '+'}${formatMoney(Math.abs(net), true)}`
       : formatMoney(spending, true);
+  const monthIsEmpty = transactions.length === 0 && !query && filter === 'all';
 
   return (
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -74,7 +77,10 @@ export function TransactionsScreen({ categories, transactions, onAdd, onReview }
       </View>
 
       <View>
-        <Text style={styles.monthLabel}>{monthLabel}</Text>
+        <Pressable accessibilityLabel="Choose activity month" onPress={onSelectMonth} style={styles.monthPicker}>
+          <Text style={styles.monthLabel}>{formatMonth(month)}</Text>
+          <MaterialCommunityIcons color={colors.inkMuted} name="chevron-down" size={17} />
+        </Pressable>
         <ScrollView contentContainerStyle={styles.filterRow} horizontal showsHorizontalScrollIndicator={false}>
           {([
             { value: 'all' as const, label: 'All' },
@@ -122,8 +128,8 @@ export function TransactionsScreen({ categories, transactions, onAdd, onReview }
         {visibleTransactions.length === 0 ? (
           <View style={styles.emptyState}>
             <MaterialCommunityIcons color={colors.primary} name={filter === 'review' ? 'check-circle-outline' : 'magnify'} size={26} />
-            <Text style={styles.emptyTitle}>{filter === 'review' ? 'Review queue cleared' : 'No matching transactions'}</Text>
-            <Text style={styles.emptyDetail}>{filter === 'review' ? 'Every imported transaction has a category.' : 'Try a different search or filter.'}</Text>
+            <Text style={styles.emptyTitle}>{filter === 'review' ? 'Review queue cleared' : monthIsEmpty ? `No activity in ${formatMonth(month, false)}` : 'No matching transactions'}</Text>
+            <Text style={styles.emptyDetail}>{filter === 'review' ? 'Every imported transaction has a category.' : monthIsEmpty ? 'Add a transaction or choose another month.' : 'Try a different search or filter.'}</Text>
           </View>
         ) : null}
       </View>
@@ -137,7 +143,8 @@ const styles = StyleSheet.create({
   addButton: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: radius.pill, height: 46, justifyContent: 'center', width: 46 },
   search: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.md },
   searchInput: { color: colors.ink, flex: 1, fontSize: 15, height: 48 },
-  monthLabel: { color: colors.inkMuted, fontSize: 12, fontWeight: '800', marginBottom: spacing.sm, textTransform: 'uppercase' },
+  monthPicker: { alignItems: 'center', alignSelf: 'flex-start', flexDirection: 'row', gap: 3, marginBottom: spacing.sm },
+  monthLabel: { color: colors.inkMuted, fontSize: 12, fontWeight: '800', textTransform: 'uppercase' },
   filterRow: { flexDirection: 'row', gap: spacing.sm, paddingRight: spacing.lg },
   filter: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 8 },
   filterActive: { backgroundColor: colors.primary, borderColor: colors.primary },

@@ -8,6 +8,7 @@ import { AddTransactionModal } from './src/components/AddTransactionModal';
 import { BottomNav } from './src/components/BottomNav';
 import { CashFlowReportModal } from './src/components/CashFlowReportModal';
 import { CategoryManagerModal } from './src/components/CategoryManagerModal';
+import { MonthPickerModal } from './src/components/MonthPickerModal';
 import { PlannedExpenseModal } from './src/components/PlannedExpenseModal';
 import { RecurringBillModal } from './src/components/RecurringBillModal';
 import { ReviewTransactionModal } from './src/components/ReviewTransactionModal';
@@ -54,7 +55,7 @@ import { TransactionsScreen } from './src/screens/TransactionsScreen';
 import { UpdatePasswordScreen } from './src/screens/UpdatePasswordScreen';
 import { colors } from './src/theme';
 import type { AppTab, Category, CategoryDraft, ImportedTransactionDraft, ManualTransactionDraft, MerchantRule, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalContribution, SavingsGoalContributionDraft, SavingsGoalDraft, Subcategory, Transaction } from './src/types';
-import { formatActivityDate } from './src/utils/date';
+import { currentMonthStart, formatActivityDate, toDateOnly } from './src/utils/date';
 import { formatMoney } from './src/utils/money';
 import { useReducedMotion } from './src/utils/useReducedMotion';
 
@@ -139,6 +140,8 @@ function BudgetApp({ session }: BudgetAppProps) {
   const forcePlanPreview = process.env.EXPO_PUBLIC_FORCE_PLAN_SETUP === 'true';
   const [activeTab, setActiveTab] = useState<AppTab>('home');
   const [transitionDirection, setTransitionDirection] = useState<-1 | 1>(1);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthStart());
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>(cloudMode ? [] : initialTransactions);
   const [categories, setCategories] = useState(cloudMode ? [] : initialCategories);
   const [connectedAccounts, setConnectedAccounts] = useState(cloudMode ? [] : accounts);
@@ -183,7 +186,7 @@ function BudgetApp({ session }: BudgetAppProps) {
     setDataLoading(true);
     setDataError(null);
     try {
-      const data = await loadCloudBudget();
+      const data = await loadCloudBudget(selectedMonth);
       setTransactions(data.transactions);
       setCategories(data.categories);
       setConnectedAccounts(data.accounts);
@@ -199,7 +202,7 @@ function BudgetApp({ session }: BudgetAppProps) {
     } finally {
       setDataLoading(false);
     }
-  }, [session]);
+  }, [selectedMonth, session]);
 
   useEffect(() => {
     void refreshCloudData();
@@ -326,6 +329,7 @@ function BudgetApp({ session }: BudgetAppProps) {
       bills: input.bills,
       categories: categories.map((category) => ({ id: category.id, budget: input.categoryBudgets[category.id] ?? 0 })),
       income: input.income,
+      month: selectedMonth,
       userId: session.user.id,
     });
     setBills(input.bills);
@@ -368,7 +372,7 @@ function BudgetApp({ session }: BudgetAppProps) {
   const toggleRecurringBillPaid = async (bill: RecurringBill) => {
     const nextPaid = !bill.paid;
     try {
-      const paidAt = session ? await setRecurringBillPaid(bill.id, nextPaid) : nextPaid ? new Date().toISOString() : undefined;
+      const paidAt = session ? await setRecurringBillPaid(bill.id, nextPaid, selectedMonth) : nextPaid ? new Date().toISOString() : undefined;
       setRecurringBills((current) => current.map((item) => (
         item.id === bill.id ? { ...item, paid: nextPaid, paidAt } : item
       )));
@@ -777,7 +781,9 @@ function BudgetApp({ session }: BudgetAppProps) {
     );
   }
 
-  const needsPlanSetup = session && (income === 0 || categories.every((category) => category.budget === 0));
+  const needsPlanSetup = session
+    && selectedMonth === currentMonthStart()
+    && (income === 0 || categories.every((category) => category.budget === 0));
   if ((session && needsPlanSetup) || planEditing) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -785,6 +791,7 @@ function BudgetApp({ session }: BudgetAppProps) {
           categories={categories}
           initialBills={bills}
           initialIncome={income}
+          key={selectedMonth}
           onCancel={needsPlanSetup ? undefined : () => setPlanEditing(false)}
           onSave={savePlan}
         />
@@ -820,8 +827,10 @@ function BudgetApp({ session }: BudgetAppProps) {
         return (
           <TransactionsScreen
             categories={categories}
+            month={selectedMonth}
             onAdd={openTransactionEntry}
             onReview={setReviewTransaction}
+            onSelectMonth={() => setMonthPickerOpen(true)}
             transactions={transactions}
           />
         );
@@ -831,6 +840,7 @@ function BudgetApp({ session }: BudgetAppProps) {
             bills={bills}
             categories={categories}
             income={income}
+            month={selectedMonth}
             onAddBill={() => openRecurringBill()}
             onAddPlannedExpense={() => openPlannedExpense()}
             onAddSavingsGoal={() => openSavingsGoal()}
@@ -840,6 +850,7 @@ function BudgetApp({ session }: BudgetAppProps) {
             onEditSavingsGoal={openSavingsGoal}
             onManageCategories={() => setCategoryManagerOpen(true)}
             onOpenCashFlow={() => setCashFlowOpen(true)}
+            onSelectMonth={() => setMonthPickerOpen(true)}
             onToggleBillPaid={(bill) => { void toggleRecurringBillPaid(bill); }}
             onTogglePlannedExpenseCovered={(expense) => { void togglePlannedExpenseCovered(expense); }}
             plannedExpenses={plannedExpenses}
@@ -854,9 +865,11 @@ function BudgetApp({ session }: BudgetAppProps) {
           <HomeScreen
             categories={categories}
             income={income}
+            month={selectedMonth}
             onAdd={openTransactionEntry}
             onConnect={() => changeTab('connect')}
             onOpenProfile={openProfile}
+            onSelectMonth={() => setMonthPickerOpen(true)}
             onToggleBillPaid={(bill) => { void toggleRecurringBillPaid(bill); }}
             onTogglePlannedExpenseCovered={(expense) => { void togglePlannedExpenseCovered(expense); }}
             onViewPlan={() => changeTab('plan')}
@@ -879,6 +892,7 @@ function BudgetApp({ session }: BudgetAppProps) {
       <BottomNav activeTab={activeTab} onChange={changeTab} />
       <AddTransactionModal
         categories={categories}
+        defaultTransactionDate={selectedMonth === currentMonthStart() ? toDateOnly(new Date()) : selectedMonth}
         initialTransaction={editingTransaction}
         onClose={() => {
           setAddOpen(false);
@@ -930,12 +944,22 @@ function BudgetApp({ session }: BudgetAppProps) {
         bills={bills}
         categories={categories}
         income={income}
+        month={selectedMonth}
         onClose={() => setCashFlowOpen(false)}
         plannedExpenses={plannedExpenses}
         previousMonthToDateSpent={previousMonthToDateSpent}
         savingsGoals={savingsGoals}
         transactions={transactions}
         visible={cashFlowOpen}
+      />
+      <MonthPickerModal
+        month={selectedMonth}
+        onClose={() => setMonthPickerOpen(false)}
+        onSelect={(month) => {
+          setSelectedMonth(month);
+          setMonthPickerOpen(false);
+        }}
+        visible={monthPickerOpen}
       />
       <CategoryManagerModal
         categories={categories}

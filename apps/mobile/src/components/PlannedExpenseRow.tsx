@@ -10,13 +10,14 @@ type PlannedExpenseRowProps = {
   categories: Category[];
   compact?: boolean;
   expense: PlannedExpense;
+  referenceMonth?: string;
   onEdit?: () => void;
   onToggleCovered: () => void;
 };
 
-export function PlannedExpenseRow({ categories, compact = false, expense, onEdit, onToggleCovered }: PlannedExpenseRowProps) {
+export function PlannedExpenseRow({ categories, compact = false, expense, referenceMonth, onEdit, onToggleCovered }: PlannedExpenseRowProps) {
   const category = categories.find((item) => item.id === expense.categoryId);
-  const monthlyAmount = plannedExpenseMonthlyAmount(expense.amount, expense.targetMonth);
+  const monthlyAmount = plannedExpenseMonthlyAmount(expense.amount, expense.targetMonth, referenceMonth);
 
   return (
     <View style={[styles.row, compact && styles.compactRow]}>

@@ -102,6 +102,51 @@ export type Database = {
           },
         ]
       }
+      category_month_budgets: {
+        Row: {
+          category_id: string
+          created_at: string
+          id: string
+          month: string
+          monthly_limit: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          id?: string
+          month: string
+          monthly_limit?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          id?: string
+          month?: string
+          monthly_limit?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "category_month_budgets_category_owner_fkey"
+            columns: ["category_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "category_month_budgets_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       financial_accounts: {
         Row: {
           account_type: string

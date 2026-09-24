@@ -9,13 +9,14 @@ import { ProgressBar } from './ProgressBar';
 
 type SavingsGoalRowProps = {
   goal: SavingsGoal;
+  referenceMonth?: string;
   onEdit: () => void;
 };
 
-export function SavingsGoalRow({ goal, onEdit }: SavingsGoalRowProps) {
+export function SavingsGoalRow({ goal, referenceMonth, onEdit }: SavingsGoalRowProps) {
   const progress = goal.targetAmount > 0 ? goal.currentAmount / goal.targetAmount : 0;
   const remaining = Math.max(goal.targetAmount - goal.currentAmount, 0);
-  const monthlyAmount = savingsGoalMonthlyAmount(goal.targetAmount, goal.currentAmount, goal.targetMonth);
+  const monthlyAmount = savingsGoalMonthlyAmount(goal.targetAmount, goal.currentAmount, goal.targetMonth, referenceMonth);
   const complete = remaining === 0;
 
   return (

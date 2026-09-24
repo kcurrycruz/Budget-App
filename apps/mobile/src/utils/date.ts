@@ -28,14 +28,31 @@ export const currentMonthStart = () => {
   return toDateOnly(new Date(now.getFullYear(), now.getMonth(), 1));
 };
 
-export const recurringBillDueDate = (dueDay: number) => {
-  const now = new Date();
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  return new Date(now.getFullYear(), now.getMonth(), Math.min(dueDay, lastDay));
+export const parseDateOnly = (dateOnly: string) => {
+  const [year, month, day] = dateOnly.split('-').map(Number);
+  return new Date(year || new Date().getFullYear(), (month || 1) - 1, day || 1);
 };
 
-export const formatRecurringDueDate = (dueDay: number) => (
-  recurringBillDueDate(dueDay).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+export const shiftMonth = (monthStart: string, amount: number) => {
+  const date = parseDateOnly(monthStart);
+  return toDateOnly(new Date(date.getFullYear(), date.getMonth() + amount, 1));
+};
+
+export const formatMonth = (monthStart: string, includeYear = true) => (
+  parseDateOnly(monthStart).toLocaleDateString('en-US', {
+    month: 'long',
+    ...(includeYear ? { year: 'numeric' as const } : {}),
+  })
+);
+
+export const recurringBillDueDate = (dueDay: number, monthStart = currentMonthStart()) => {
+  const month = parseDateOnly(monthStart);
+  const lastDay = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  return new Date(month.getFullYear(), month.getMonth(), Math.min(dueDay, lastDay));
+};
+
+export const formatRecurringDueDate = (dueDay: number, monthStart = currentMonthStart()) => (
+  recurringBillDueDate(dueDay, monthStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 );
 
 export const formatTargetMonth = (targetMonth: string, long = false) => {
@@ -47,14 +64,14 @@ export const formatTargetMonth = (targetMonth: string, long = false) => {
   });
 };
 
-export const plannedExpenseMonthlyAmount = (amount: number, targetMonth: string) => {
-  const now = new Date();
+export const plannedExpenseMonthlyAmount = (amount: number, targetMonth: string, referenceMonth = currentMonthStart()) => {
+  const now = parseDateOnly(referenceMonth);
   const [year, month] = targetMonth.split('-').map(Number);
   if (!year || !month) return amount;
   const monthsRemaining = Math.max(1, ((year - now.getFullYear()) * 12) + month - now.getMonth());
   return amount / monthsRemaining;
 };
 
-export const savingsGoalMonthlyAmount = (targetAmount: number, currentAmount: number, targetMonth: string) => (
-  plannedExpenseMonthlyAmount(Math.max(targetAmount - currentAmount, 0), targetMonth)
+export const savingsGoalMonthlyAmount = (targetAmount: number, currentAmount: number, targetMonth: string, referenceMonth = currentMonthStart()) => (
+  plannedExpenseMonthlyAmount(Math.max(targetAmount - currentAmount, 0), targetMonth, referenceMonth)
 );

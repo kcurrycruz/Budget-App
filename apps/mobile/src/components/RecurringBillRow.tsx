@@ -3,27 +3,29 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, spacing } from '../theme';
 import type { RecurringBill } from '../types';
-import { formatRecurringDueDate, recurringBillDueDate } from '../utils/date';
+import { currentMonthStart, formatRecurringDueDate, recurringBillDueDate } from '../utils/date';
 import { formatMoney } from '../utils/money';
 
 type RecurringBillRowProps = {
   bill: RecurringBill;
   compact?: boolean;
+  month: string;
   onEdit?: () => void;
   onTogglePaid: () => void;
 };
 
-const dueLabel = (bill: RecurringBill) => {
+const dueLabel = (bill: RecurringBill, month: string) => {
   if (bill.paid) return 'Paid this month';
-  const due = recurringBillDueDate(bill.dueDay);
+  const due = recurringBillDueDate(bill.dueDay, month);
+  if (month !== currentMonthStart()) return `Due ${formatRecurringDueDate(bill.dueDay, month)}`;
   const today = new Date();
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   if (due.getTime() === todayStart.getTime()) return 'Due today';
-  if (due < todayStart) return `Overdue · ${formatRecurringDueDate(bill.dueDay)}`;
-  return `Due ${formatRecurringDueDate(bill.dueDay)}`;
+  if (due < todayStart) return `Overdue · ${formatRecurringDueDate(bill.dueDay, month)}`;
+  return `Due ${formatRecurringDueDate(bill.dueDay, month)}`;
 };
 
-export function RecurringBillRow({ bill, compact = false, onEdit, onTogglePaid }: RecurringBillRowProps) {
+export function RecurringBillRow({ bill, compact = false, month, onEdit, onTogglePaid }: RecurringBillRowProps) {
   return (
     <View style={[styles.row, compact && styles.compactRow]}>
       <Pressable
@@ -38,7 +40,7 @@ export function RecurringBillRow({ bill, compact = false, onEdit, onTogglePaid }
       </Pressable>
       <Pressable disabled={!onEdit} onPress={onEdit} style={styles.copy}>
         <Text numberOfLines={1} style={[styles.name, bill.paid && styles.namePaid]}>{bill.name}</Text>
-        <Text style={[styles.due, !bill.paid && dueLabel(bill).startsWith('Overdue') && styles.overdue]}>{dueLabel(bill)}</Text>
+        <Text style={[styles.due, !bill.paid && dueLabel(bill, month).startsWith('Overdue') && styles.overdue]}>{dueLabel(bill, month)}</Text>
       </Pressable>
       <Pressable disabled={!onEdit} onPress={onEdit} style={styles.amountBlock}>
         <Text style={[styles.amount, bill.paid && styles.amountPaid]}>{formatMoney(bill.amount, bill.amount % 1 !== 0)}</Text>

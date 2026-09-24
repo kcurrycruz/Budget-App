@@ -19,6 +19,7 @@ import { formatMoneyInput, parseMoneyInput } from '../utils/money';
 
 type AddTransactionModalProps = {
   categories: Category[];
+  defaultTransactionDate?: string;
   initialTransaction?: Transaction | null;
   visible: boolean;
   saving: boolean;
@@ -26,13 +27,13 @@ type AddTransactionModalProps = {
   onSave: (draft: ManualTransactionDraft) => void;
 };
 
-export function AddTransactionModal({ categories, initialTransaction, visible, saving, onClose, onSave }: AddTransactionModalProps) {
+export function AddTransactionModal({ categories, defaultTransactionDate = toDateOnly(new Date()), initialTransaction, visible, saving, onClose, onSave }: AddTransactionModalProps) {
   const [merchant, setMerchant] = useState('');
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState(categories[0]?.id ?? 'other');
   const [subcategoryId, setSubcategoryId] = useState('');
   const [direction, setDirection] = useState<'outflow' | 'inflow'>('outflow');
-  const [transactionDate, setTransactionDate] = useState(toDateOnly(new Date()));
+  const [transactionDate, setTransactionDate] = useState(defaultTransactionDate);
   const [note, setNote] = useState('');
 
   useEffect(() => {
@@ -44,26 +45,28 @@ export function AddTransactionModal({ categories, initialTransaction, visible, s
       setDirection(initialTransaction.direction ?? 'outflow');
       setTransactionDate(initialTransaction.transactionDate ?? toDateOnly(new Date()));
       setNote(initialTransaction.note ?? '');
-    } else if (!visible) {
+    } else if (visible) {
       setMerchant('');
       setAmount('');
       setCategoryId(categories[0]?.id ?? 'other');
       setSubcategoryId('');
       setDirection('outflow');
-      setTransactionDate(toDateOnly(new Date()));
+      setTransactionDate(defaultTransactionDate);
       setNote('');
     }
-  }, [categories, initialTransaction, visible]);
+  }, [categories, defaultTransactionDate, initialTransaction, visible]);
 
   const today = toDateOnly(new Date());
   const yesterdayDate = new Date();
   yesterdayDate.setDate(yesterdayDate.getDate() - 1);
   const yesterday = toDateOnly(yesterdayDate);
+  const defaultIsCurrentMonth = defaultTransactionDate.slice(0, 7) === today.slice(0, 7);
   const dateOptions = [
-    { value: today, label: 'Today' },
-    { value: yesterday, label: 'Yesterday' },
+    ...(defaultIsCurrentMonth
+      ? [{ value: today, label: 'Today' }, { value: yesterday, label: 'Yesterday' }]
+      : [{ value: defaultTransactionDate, label: formatActivityDate(defaultTransactionDate) }]),
     ...(initialTransaction?.transactionDate
-      && ![today, yesterday].includes(initialTransaction.transactionDate)
+      && ![...(defaultIsCurrentMonth ? [today, yesterday] : [defaultTransactionDate])].includes(initialTransaction.transactionDate)
       ? [{ value: initialTransaction.transactionDate, label: initialTransaction.date || formatActivityDate(initialTransaction.transactionDate) }]
       : []),
   ];

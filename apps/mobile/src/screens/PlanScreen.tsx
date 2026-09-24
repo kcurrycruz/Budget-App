@@ -8,12 +8,13 @@ import { SavingsGoalRow } from '../components/SavingsGoalRow';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { colors, radius, spacing } from '../theme';
 import type { Category, PlannedExpense, RecurringBill, SavingsGoal } from '../types';
-import { plannedExpenseMonthlyAmount, savingsGoalMonthlyAmount } from '../utils/date';
+import { formatMonth, plannedExpenseMonthlyAmount, savingsGoalMonthlyAmount } from '../utils/date';
 import { formatMoney } from '../utils/money';
 
 type PlanScreenProps = {
   categories: Category[];
   income: number;
+  month: string;
   bills: number;
   plannedExpenses: PlannedExpense[];
   recurringBills: RecurringBill[];
@@ -27,6 +28,7 @@ type PlanScreenProps = {
   onEditSavingsGoal: (goal: SavingsGoal) => void;
   onManageCategories: () => void;
   onOpenCashFlow: () => void;
+  onSelectMonth: () => void;
   onToggleBillPaid: (bill: RecurringBill) => void;
   onTogglePlannedExpenseCovered: (expense: PlannedExpense) => void;
 };
@@ -34,6 +36,7 @@ type PlanScreenProps = {
 export function PlanScreen({
   categories,
   income,
+  month,
   bills,
   plannedExpenses,
   recurringBills,
@@ -47,15 +50,16 @@ export function PlanScreen({
   onEditSavingsGoal,
   onManageCategories,
   onOpenCashFlow,
+  onSelectMonth,
   onToggleBillPaid,
   onTogglePlannedExpenseCovered,
 }: PlanScreenProps) {
   const flexibleBudget = categories.reduce((sum, category) => sum + category.budget, 0);
   const plannedSetAside = plannedExpenses
     .filter((expense) => !expense.covered)
-    .reduce((sum, expense) => sum + plannedExpenseMonthlyAmount(expense.amount, expense.targetMonth), 0);
+    .reduce((sum, expense) => sum + plannedExpenseMonthlyAmount(expense.amount, expense.targetMonth, month), 0);
   const goalSetAside = savingsGoals.reduce((sum, goal) => (
-    sum + savingsGoalMonthlyAmount(goal.targetAmount, goal.currentAmount, goal.targetMonth)
+    sum + savingsGoalMonthlyAmount(goal.targetAmount, goal.currentAmount, goal.targetMonth, month)
   ), 0);
   const totalGoalSaved = savingsGoals.reduce((sum, goal) => sum + goal.currentAmount, 0);
   const totalGoalTarget = savingsGoals.reduce((sum, goal) => sum + goal.targetAmount, 0);
@@ -68,7 +72,14 @@ export function PlanScreen({
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.headerRow}>
-        <ScreenHeader detail="Give every dollar a simple job." eyebrow="September" title="Monthly plan" />
+        <View>
+          <ScreenHeader detail="Give every dollar a simple job." title="Monthly plan" />
+          <Pressable accessibilityLabel="Choose plan month" onPress={onSelectMonth} style={styles.monthPicker}>
+            <MaterialCommunityIcons color={colors.primary} name="calendar-month-outline" size={15} />
+            <Text style={styles.monthText}>{formatMonth(month)}</Text>
+            <MaterialCommunityIcons color={colors.primary} name="chevron-down" size={16} />
+          </Pressable>
+        </View>
         <Pressable accessibilityLabel="Edit monthly plan" onPress={onEdit} style={styles.editButton}>
           <MaterialCommunityIcons color={colors.primaryDark} name="pencil-outline" size={19} />
           <Text style={styles.editText}>Edit</Text>
@@ -136,6 +147,7 @@ export function PlanScreen({
             <View key={bill.id}>
               <RecurringBillRow
                 bill={bill}
+                month={month}
                 onEdit={() => onEditBill(bill)}
                 onTogglePaid={() => onToggleBillPaid(bill)}
               />
@@ -174,6 +186,7 @@ export function PlanScreen({
               <PlannedExpenseRow
                 categories={categories}
                 expense={expense}
+                referenceMonth={month}
                 onEdit={() => onEditPlannedExpense(expense)}
                 onToggleCovered={() => onTogglePlannedExpenseCovered(expense)}
               />
@@ -211,7 +224,7 @@ export function PlanScreen({
         <View style={styles.billList}>
           {savingsGoals.map((goal, index) => (
             <View key={goal.id}>
-              <SavingsGoalRow goal={goal} onEdit={() => onEditSavingsGoal(goal)} />
+              <SavingsGoalRow goal={goal} referenceMonth={month} onEdit={() => onEditSavingsGoal(goal)} />
               {index < savingsGoals.length - 1 ? <View style={styles.billDivider} /> : null}
             </View>
           ))}
@@ -274,6 +287,8 @@ export function PlanScreen({
 const styles = StyleSheet.create({
   content: { gap: spacing.xl, padding: spacing.lg, paddingBottom: spacing.xxl, paddingTop: spacing.xl },
   headerRow: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'space-between' },
+  monthPicker: { alignItems: 'center', alignSelf: 'flex-start', flexDirection: 'row', gap: 4, marginTop: spacing.sm },
+  monthText: { color: colors.primaryDark, fontSize: 12, fontWeight: '800' },
   editButton: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.pill, flexDirection: 'row', gap: 5, marginTop: spacing.sm, paddingHorizontal: 12, paddingVertical: 9 },
   editText: { color: colors.primaryDark, fontSize: 12, fontWeight: '800' },
   planCard: { backgroundColor: colors.primaryDark, borderRadius: radius.lg, gap: spacing.lg, padding: spacing.xl },

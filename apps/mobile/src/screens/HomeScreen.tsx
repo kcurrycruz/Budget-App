@@ -7,13 +7,14 @@ import { RecurringBillRow } from '../components/RecurringBillRow';
 import { TransactionRow } from '../components/TransactionRow';
 import { colors, radius, shadow, spacing } from '../theme';
 import type { Category, PlannedExpense, RecurringBill, Transaction } from '../types';
-import { plannedExpenseMonthlyAmount } from '../utils/date';
+import { formatMonth, plannedExpenseMonthlyAmount } from '../utils/date';
 import { formatMoney } from '../utils/money';
 
 type HomeScreenProps = {
   categories: Category[];
   transactions: Transaction[];
   income: number;
+  month: string;
   plannedExpenses: PlannedExpense[];
   recurringBills: RecurringBill[];
   onAdd: () => void;
@@ -23,6 +24,7 @@ type HomeScreenProps = {
   onToggleBillPaid: (bill: RecurringBill) => void;
   onTogglePlannedExpenseCovered: (expense: PlannedExpense) => void;
   onOpenProfile?: () => void;
+  onSelectMonth: () => void;
   userName?: string;
   userInitials?: string;
   previewMode?: boolean;
@@ -32,6 +34,7 @@ export function HomeScreen({
   categories,
   transactions,
   income,
+  month,
   plannedExpenses,
   recurringBills,
   onAdd,
@@ -41,6 +44,7 @@ export function HomeScreen({
   onToggleBillPaid,
   onTogglePlannedExpenseCovered,
   onOpenProfile,
+  onSelectMonth,
   userName = 'Alex',
   userInitials = 'KC',
   previewMode = false,
@@ -48,7 +52,7 @@ export function HomeScreen({
   const spent = categories.reduce((total, category) => total + category.spent, 0);
   const plannedSetAside = plannedExpenses
     .filter((expense) => !expense.covered)
-    .reduce((sum, expense) => sum + plannedExpenseMonthlyAmount(expense.amount, expense.targetMonth), 0);
+    .reduce((sum, expense) => sum + plannedExpenseMonthlyAmount(expense.amount, expense.targetMonth, month), 0);
   const left = income - spent - plannedSetAside;
   const upcomingBills = recurringBills.filter((bill) => !bill.paid).slice(0, 3);
   const upcomingExpenses = plannedExpenses.filter((expense) => !expense.covered).slice(0, 2);
@@ -56,7 +60,6 @@ export function HomeScreen({
   const now = new Date();
   const hour = now.getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-  const currentMonth = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(now);
 
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -64,10 +67,11 @@ export function HomeScreen({
         <View style={styles.headerCopy}>
           <Text style={styles.greeting}>{greeting},</Text>
           <Text numberOfLines={1} style={styles.title}>{userName}</Text>
-          <View style={styles.monthLine}>
+          <Pressable accessibilityLabel="Choose budget month" onPress={onSelectMonth} style={styles.monthLine}>
             <MaterialCommunityIcons color={colors.inkMuted} name="calendar-blank-outline" size={13} />
-            <Text style={styles.monthText}>{currentMonth} overview</Text>
-          </View>
+            <Text style={styles.monthText}>{formatMonth(month)} overview</Text>
+            <MaterialCommunityIcons color={colors.inkMuted} name="chevron-down" size={14} />
+          </Pressable>
         </View>
         <Pressable accessibilityLabel="Open account menu" onPress={onOpenProfile} style={styles.avatar}>
           <Text style={styles.avatarText}>{userInitials}</Text>
@@ -156,7 +160,7 @@ export function HomeScreen({
           <View style={styles.billCard}>
             {upcomingBills.length ? upcomingBills.map((bill, index) => (
               <View key={bill.id}>
-                <RecurringBillRow bill={bill} compact onTogglePaid={() => onToggleBillPaid(bill)} />
+                <RecurringBillRow bill={bill} compact month={month} onTogglePaid={() => onToggleBillPaid(bill)} />
                 {index < upcomingBills.length - 1 ? <View style={styles.billDivider} /> : null}
               </View>
             )) : (
@@ -190,6 +194,7 @@ export function HomeScreen({
                   categories={categories}
                   compact
                   expense={expense}
+                  referenceMonth={month}
                   onToggleCovered={() => onTogglePlannedExpenseCovered(expense)}
                 />
                 {index < upcomingExpenses.length - 1 ? <View style={styles.billDivider} /> : null}
@@ -227,6 +232,13 @@ export function HomeScreen({
             {index < Math.min(transactions.length, 4) - 1 ? <View style={styles.divider} /> : null}
           </View>
         ))}
+        {transactions.length === 0 ? (
+          <View style={styles.emptyActivity}>
+            <MaterialCommunityIcons color={colors.primary} name="calendar-blank-outline" size={23} />
+            <Text style={styles.emptyActivityTitle}>No activity in {formatMonth(month, false)}</Text>
+            <Text style={styles.emptyActivityDetail}>Transactions added for this month will appear here.</Text>
+          </View>
+        ) : null}
       </View>
     </ScrollView>
   );
@@ -271,6 +283,9 @@ const styles = StyleSheet.create({
   categoryMeta: { color: colors.inkMuted, fontSize: 11 },
   link: { color: colors.primary, fontSize: 13, fontWeight: '800' },
   activityCard: { backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.lg },
+  emptyActivity: { alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.xl },
+  emptyActivityTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  emptyActivityDetail: { color: colors.inkMuted, fontSize: 11, textAlign: 'center' },
   divider: { backgroundColor: colors.border, height: StyleSheet.hairlineWidth, marginLeft: 56 },
   billCard: { backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.lg },
   billDivider: { backgroundColor: colors.border, height: StyleSheet.hairlineWidth, marginLeft: 38 },

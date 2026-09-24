@@ -3,13 +3,14 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 
 import { colors, radius, spacing } from '../theme';
 import type { Category, PlannedExpense, SavingsGoal, Transaction } from '../types';
-import { plannedExpenseMonthlyAmount, savingsGoalMonthlyAmount } from '../utils/date';
+import { currentMonthStart, formatMonth, parseDateOnly, plannedExpenseMonthlyAmount, savingsGoalMonthlyAmount, shiftMonth } from '../utils/date';
 import { formatMoney } from '../utils/money';
 
 type CashFlowReportModalProps = {
   bills: number;
   categories: Category[];
   income: number;
+  month: string;
   onClose: () => void;
   plannedExpenses: PlannedExpense[];
   previousMonthToDateSpent: number;
@@ -44,6 +45,7 @@ export function CashFlowReportModal({
   bills,
   categories,
   income,
+  month,
   onClose,
   plannedExpenses,
   previousMonthToDateSpent,
@@ -51,15 +53,18 @@ export function CashFlowReportModal({
   transactions,
   visible,
 }: CashFlowReportModalProps) {
-  const now = new Date();
-  const currentMonth = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(now);
-  const previousMonth = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(
-    new Date(now.getFullYear(), now.getMonth() - 1, 1),
-  );
-  const previousComparisonDay = Math.min(
-    now.getDate(),
-    new Date(now.getFullYear(), now.getMonth(), 0).getDate(),
-  );
+  const selectedDate = parseDateOnly(month);
+  const today = new Date();
+  const isCurrentMonth = month === currentMonthStart();
+  const currentMonth = formatMonth(month, false);
+  const previousMonthStart = shiftMonth(month, -1);
+  const previousMonth = formatMonth(previousMonthStart, false);
+  const comparisonDay = isCurrentMonth
+    ? today.getDate()
+    : new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate();
+  const previousComparisonDay = isCurrentMonth
+    ? Math.min(today.getDate(), new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 0).getDate())
+    : new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 0).getDate();
   const received = transactions
     .filter((transaction) => transaction.direction === 'inflow')
     .reduce((sum, transaction) => sum + transaction.amount, 0);
@@ -70,9 +75,9 @@ export function CashFlowReportModal({
   const spent = Math.max(transactionOutflows, categorizedSpending);
   const plannedExpenseSetAside = plannedExpenses
     .filter((expense) => !expense.covered)
-    .reduce((sum, expense) => sum + plannedExpenseMonthlyAmount(expense.amount, expense.targetMonth), 0);
+    .reduce((sum, expense) => sum + plannedExpenseMonthlyAmount(expense.amount, expense.targetMonth, month), 0);
   const savingsGoalSetAside = savingsGoals.reduce((sum, goal) => (
-    sum + savingsGoalMonthlyAmount(goal.targetAmount, goal.currentAmount, goal.targetMonth)
+    sum + savingsGoalMonthlyAmount(goal.targetAmount, goal.currentAmount, goal.targetMonth, month)
   ), 0);
   const setAside = plannedExpenseSetAside + savingsGoalSetAside;
   const available = income - spent - setAside;
@@ -180,7 +185,7 @@ export function CashFlowReportModal({
           <View style={styles.sectionHeading}>
             <View>
               <Text style={styles.sectionTitle}>Month-to-month</Text>
-              <Text style={styles.sectionDetail}>{currentMonth} 1–{now.getDate()} vs {previousMonth} 1–{previousComparisonDay}</Text>
+              <Text style={styles.sectionDetail}>{currentMonth} 1–{comparisonDay} vs {previousMonth} 1–{previousComparisonDay}</Text>
             </View>
             <View style={[styles.trendBadge, { backgroundColor: `${trendColor}18` }]}>
               <MaterialCommunityIcons
