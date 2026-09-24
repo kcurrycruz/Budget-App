@@ -1,9 +1,10 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, spacing } from '../theme';
 import type { Category, MerchantRule } from '../types';
+import { confirmAction, showMessage } from '../utils/dialogs';
 
 type MerchantRulesModalProps = {
   categories: Category[];
@@ -21,21 +22,20 @@ export function MerchantRulesModal({ categories, onClose, onDelete, rules, visib
     try {
       await onDelete(rule.id);
     } catch (caught) {
-      Alert.alert('Could not remove rule', caught instanceof Error ? caught.message : 'Please try again.');
+      showMessage('Could not remove rule', caught instanceof Error ? caught.message : 'Please try again.');
     } finally {
       setDeletingId(null);
     }
   };
 
-  const confirmDelete = (rule: MerchantRule) => {
-    Alert.alert(
-      'Remove this merchant rule?',
-      `Future transactions from ${rule.merchantName} will need to be categorized again. Past transactions will not change.`,
-      [
-        { text: 'Keep rule', style: 'cancel' },
-        { text: 'Remove', style: 'destructive', onPress: () => { void deleteRule(rule); } },
-      ],
-    );
+  const confirmDelete = async (rule: MerchantRule) => {
+    const confirmed = await confirmAction({
+      title: 'Remove this merchant rule?',
+      message: `Future transactions from ${rule.merchantName} will need to be categorized again. Past transactions will not change.`,
+      cancelLabel: 'Keep rule',
+      confirmLabel: 'Remove',
+    });
+    if (confirmed) await deleteRule(rule);
   };
 
   return (
@@ -91,7 +91,7 @@ export function MerchantRulesModal({ categories, onClose, onDelete, rules, visib
                   <Pressable
                     accessibilityLabel={`Remove ${rule.merchantName} rule`}
                     disabled={Boolean(deletingId)}
-                    onPress={() => confirmDelete(rule)}
+                    onPress={() => { void confirmDelete(rule); }}
                     style={styles.removeButton}
                   >
                     {deleting

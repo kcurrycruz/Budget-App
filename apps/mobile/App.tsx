@@ -3,7 +3,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import type { Session } from '@supabase/supabase-js';
 import type { PropsWithChildren } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Animated, AppState, Easing, Platform, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Animated, AppState, Easing, Platform, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
 import { AddTransactionModal } from './src/components/AddTransactionModal';
 import { BottomNav } from './src/components/BottomNav';
@@ -63,6 +63,7 @@ import { UpdatePasswordScreen } from './src/screens/UpdatePasswordScreen';
 import { colors } from './src/theme';
 import type { AppTab, Category, CategoryDraft, ImportedTransactionDraft, ManualTransactionDraft, MerchantRule, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalContribution, SavingsGoalContributionDraft, SavingsGoalDraft, Subcategory, SubscriptionSuggestion, Transaction } from './src/types';
 import { currentMonthStart, formatActivityDate, toDateOnly } from './src/utils/date';
+import { confirmAction, showMessage } from './src/utils/dialogs';
 import { formatMoney } from './src/utils/money';
 import { useReducedMotion } from './src/utils/useReducedMotion';
 
@@ -367,7 +368,7 @@ function BudgetApp({ session }: BudgetAppProps) {
             };
       }
     } catch (caught) {
-      Alert.alert('Could not save transaction', caught instanceof Error ? caught.message : 'Please try again.');
+      showMessage('Could not save transaction', caught instanceof Error ? caught.message : 'Please try again.');
       return;
     } finally {
       setAddSaving(false);
@@ -426,23 +427,20 @@ function BudgetApp({ session }: BudgetAppProps) {
       }
       setReviewTransaction(null);
     } catch (caught) {
-      Alert.alert('Could not delete transaction', caught instanceof Error ? caught.message : 'Please try again.');
+      showMessage('Could not delete transaction', caught instanceof Error ? caught.message : 'Please try again.');
     } finally {
       setReviewDeleting(false);
     }
   };
 
-  const confirmDeleteReviewedTransaction = () => {
+  const confirmDeleteReviewedTransaction = async () => {
     const transaction = reviewTransaction;
     if (!transaction || transaction.source !== 'manual') return;
-    Alert.alert(
-      'Delete this transaction?',
-      `${transaction.merchant} will be permanently removed from your budget.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => { void performDeleteReviewedTransaction(transaction); } },
-      ],
-    );
+    const confirmed = await confirmAction({
+      title: 'Delete this transaction?',
+      message: `${transaction.merchant} will be permanently removed from your budget.`,
+    });
+    if (confirmed) await performDeleteReviewedTransaction(transaction);
   };
 
   const savePlan = async (input: { bills: number; categoryBudgets: Record<string, number>; income: number }) => {
@@ -472,7 +470,7 @@ function BudgetApp({ session }: BudgetAppProps) {
         budget: copied.categoryBudgets[category.id] ?? 0,
       })));
     } catch (caught) {
-      Alert.alert('Could not copy the plan', caught instanceof Error ? caught.message : 'Please try again.');
+      showMessage('Could not copy the plan', caught instanceof Error ? caught.message : 'Please try again.');
     } finally {
       setPlanCopying(false);
     }
@@ -504,7 +502,7 @@ function BudgetApp({ session }: BudgetAppProps) {
       if (session) await dismissSubscriptionSuggestion(suggestion.merchantKey);
       setSubscriptionSuggestions((current) => current.filter((item) => item.merchantKey !== suggestion.merchantKey));
     } catch (caught) {
-      Alert.alert('Could not dismiss suggestion', caught instanceof Error ? caught.message : 'Please try again.');
+      showMessage('Could not dismiss suggestion', caught instanceof Error ? caught.message : 'Please try again.');
     } finally {
       setDismissingSuggestion(null);
     }
@@ -535,7 +533,7 @@ function BudgetApp({ session }: BudgetAppProps) {
       setSuggestedBillDraft(null);
       setAddingSuggestionKey(null);
     } catch (caught) {
-      Alert.alert('Could not save recurring bill', caught instanceof Error ? caught.message : 'Please try again.');
+      showMessage('Could not save recurring bill', caught instanceof Error ? caught.message : 'Please try again.');
     } finally {
       setBillSaving(false);
     }
@@ -549,7 +547,7 @@ function BudgetApp({ session }: BudgetAppProps) {
         item.id === bill.id ? { ...item, paid: nextPaid, paidAt } : item
       )));
     } catch (caught) {
-      Alert.alert('Could not update bill', caught instanceof Error ? caught.message : 'Please try again.');
+      showMessage('Could not update bill', caught instanceof Error ? caught.message : 'Please try again.');
     }
   };
 
@@ -561,23 +559,20 @@ function BudgetApp({ session }: BudgetAppProps) {
       setBillOpen(false);
       setEditingBill(null);
     } catch (caught) {
-      Alert.alert('Could not delete recurring bill', caught instanceof Error ? caught.message : 'Please try again.');
+      showMessage('Could not delete recurring bill', caught instanceof Error ? caught.message : 'Please try again.');
     } finally {
       setBillSaving(false);
     }
   };
 
-  const confirmDeleteRecurringBill = () => {
+  const confirmDeleteRecurringBill = async () => {
     const bill = editingBill;
     if (!bill) return;
-    Alert.alert(
-      'Delete this recurring bill?',
-      `${bill.name} and its payment history will be permanently removed.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => { void performDeleteRecurringBill(bill); } },
-      ],
-    );
+    const confirmed = await confirmAction({
+      title: 'Delete this recurring bill?',
+      message: `${bill.name} and its payment history will be permanently removed.`,
+    });
+    if (confirmed) await performDeleteRecurringBill(bill);
   };
 
   const sortPlannedExpenses = (items: PlannedExpense[]) => [...items].sort((left, right) => (
@@ -610,7 +605,7 @@ function BudgetApp({ session }: BudgetAppProps) {
       setPlannedExpenseOpen(false);
       setEditingPlannedExpense(null);
     } catch (caught) {
-      Alert.alert('Could not save planned expense', caught instanceof Error ? caught.message : 'Please try again.');
+      showMessage('Could not save planned expense', caught instanceof Error ? caught.message : 'Please try again.');
     } finally {
       setPlannedExpenseSaving(false);
     }
@@ -627,7 +622,7 @@ function BudgetApp({ session }: BudgetAppProps) {
           };
       setPlannedExpenses((current) => sortPlannedExpenses(current.map((item) => item.id === expense.id ? saved : item)));
     } catch (caught) {
-      Alert.alert('Could not update planned expense', caught instanceof Error ? caught.message : 'Please try again.');
+      showMessage('Could not update planned expense', caught instanceof Error ? caught.message : 'Please try again.');
     }
   };
 
@@ -639,23 +634,20 @@ function BudgetApp({ session }: BudgetAppProps) {
       setPlannedExpenseOpen(false);
       setEditingPlannedExpense(null);
     } catch (caught) {
-      Alert.alert('Could not delete planned expense', caught instanceof Error ? caught.message : 'Please try again.');
+      showMessage('Could not delete planned expense', caught instanceof Error ? caught.message : 'Please try again.');
     } finally {
       setPlannedExpenseSaving(false);
     }
   };
 
-  const confirmDeletePlannedExpense = () => {
+  const confirmDeletePlannedExpense = async () => {
     const expense = editingPlannedExpense;
     if (!expense) return;
-    Alert.alert(
-      'Delete this planned expense?',
-      `${expense.name} will be permanently removed from your plan.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => { void performDeletePlannedExpense(expense); } },
-      ],
-    );
+    const confirmed = await confirmAction({
+      title: 'Delete this planned expense?',
+      message: `${expense.name} will be permanently removed from your plan.`,
+    });
+    if (confirmed) await performDeletePlannedExpense(expense);
   };
 
   const sortSavingsGoals = (items: SavingsGoal[]) => [...items].sort((left, right) => (
@@ -697,7 +689,7 @@ function BudgetApp({ session }: BudgetAppProps) {
       setSavingsGoalOpen(false);
       setEditingSavingsGoal(null);
     } catch (caught) {
-      Alert.alert('Could not save savings goal', caught instanceof Error ? caught.message : 'Please try again.');
+      showMessage('Could not save savings goal', caught instanceof Error ? caught.message : 'Please try again.');
     } finally {
       setSavingsGoalSaving(false);
     }
@@ -727,7 +719,7 @@ function BudgetApp({ session }: BudgetAppProps) {
       setEditingSavingsGoal(updatedGoal);
       return true;
     } catch (caught) {
-      Alert.alert('Could not add contribution', caught instanceof Error ? caught.message : 'Please try again.');
+      showMessage('Could not add contribution', caught instanceof Error ? caught.message : 'Please try again.');
       return false;
     } finally {
       setSavingsContributionSaving(false);
@@ -748,21 +740,18 @@ function BudgetApp({ session }: BudgetAppProps) {
       setSavingsGoals((current) => sortSavingsGoals(current.map((item) => item.id === goal.id ? updatedGoal : item)));
       setEditingSavingsGoal(updatedGoal);
     } catch (caught) {
-      Alert.alert('Could not delete contribution', caught instanceof Error ? caught.message : 'Please try again.');
+      showMessage('Could not delete contribution', caught instanceof Error ? caught.message : 'Please try again.');
     } finally {
       setSavingsContributionSaving(false);
     }
   };
 
-  const confirmDeleteSavingsGoalContribution = (contribution: SavingsGoalContribution) => {
-    Alert.alert(
-      'Delete this contribution?',
-      `${formatMoney(contribution.amount)} will be removed from ${editingSavingsGoal?.name ?? 'this goal'}.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => { void performDeleteSavingsGoalContribution(contribution); } },
-      ],
-    );
+  const confirmDeleteSavingsGoalContribution = async (contribution: SavingsGoalContribution) => {
+    const confirmed = await confirmAction({
+      title: 'Delete this contribution?',
+      message: `${formatMoney(contribution.amount)} will be removed from ${editingSavingsGoal?.name ?? 'this goal'}.`,
+    });
+    if (confirmed) await performDeleteSavingsGoalContribution(contribution);
   };
 
   const performDeleteSavingsGoal = async (goal: SavingsGoal) => {
@@ -773,23 +762,20 @@ function BudgetApp({ session }: BudgetAppProps) {
       setSavingsGoalOpen(false);
       setEditingSavingsGoal(null);
     } catch (caught) {
-      Alert.alert('Could not delete savings goal', caught instanceof Error ? caught.message : 'Please try again.');
+      showMessage('Could not delete savings goal', caught instanceof Error ? caught.message : 'Please try again.');
     } finally {
       setSavingsGoalSaving(false);
     }
   };
 
-  const confirmDeleteSavingsGoal = () => {
+  const confirmDeleteSavingsGoal = async () => {
     const goal = editingSavingsGoal;
     if (!goal) return;
-    Alert.alert(
-      'Delete this savings goal?',
-      `${goal.name}, its saved progress, and its contribution history will be permanently removed.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => { void performDeleteSavingsGoal(goal); } },
-      ],
-    );
+    const confirmed = await confirmAction({
+      title: 'Delete this savings goal?',
+      message: `${goal.name}, its saved progress, and its contribution history will be permanently removed.`,
+    });
+    if (confirmed) await performDeleteSavingsGoal(goal);
   };
 
   const saveTransactionCategory = async (categoryId: string, subcategoryId?: string, rememberMerchant = false) => {
@@ -825,7 +811,7 @@ function BudgetApp({ session }: BudgetAppProps) {
       }
       setReviewTransaction(null);
     } catch (caught) {
-      Alert.alert('Could not update category', caught instanceof Error ? caught.message : 'Please try again.');
+      showMessage('Could not update category', caught instanceof Error ? caught.message : 'Please try again.');
     } finally {
       setReviewSaving(false);
     }
@@ -907,7 +893,7 @@ function BudgetApp({ session }: BudgetAppProps) {
     : displayName.slice(0, 2).toUpperCase();
   const openProfile = () => {
     if (!session || !supabase) {
-      Alert.alert('Preview mode', 'Cloud accounts will appear here after Supabase is connected.');
+      showMessage('Preview mode', 'Cloud accounts will appear here after Supabase is connected.');
       return;
     }
     setAccountOpen(true);

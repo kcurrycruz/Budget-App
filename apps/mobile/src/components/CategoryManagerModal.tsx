@@ -1,9 +1,10 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useEffect, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { colors, radius, spacing } from '../theme';
 import type { Category, CategoryDraft, SpendingGroup, Subcategory } from '../types';
+import { confirmAction } from '../utils/dialogs';
 
 const colorOptions = ['#247A52', '#CA6946', '#4777B8', '#9A6AB3', '#D09625', '#3F7C8E'];
 const iconOptions = ['home-outline', 'food-fork-drink', 'car-outline', 'shopping-outline', 'heart-pulse', 'wallet-outline', 'gamepad-variant-outline', 'dots-horizontal-circle-outline'] as const;
@@ -108,15 +109,13 @@ export function CategoryManagerModal({ archivedCategories, categories, visible, 
     }
   };
 
-  const confirmArchiveCategory = (category: Category) => {
-    Alert.alert(
-      `Archive ${category.name}?`,
-      'It will leave your plan and new transaction choices. Existing transactions stay in your history.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Archive', style: 'destructive', onPress: () => { void performArchiveCategory(category); } },
-      ],
-    );
+  const confirmArchiveCategory = async (category: Category) => {
+    const confirmed = await confirmAction({
+      title: `Archive ${category.name}?`,
+      message: 'It will leave your plan and new transaction choices. Existing transactions stay in your history.',
+      confirmLabel: 'Archive',
+    });
+    if (confirmed) await performArchiveCategory(category);
   };
 
   const restoreCategory = async (category: Category) => {
@@ -250,7 +249,7 @@ export function CategoryManagerModal({ archivedCategories, categories, visible, 
               {subcategory ? <Pressable onPress={() => { setSubcategory(undefined); setSubcategoryName(''); }}><Text style={styles.cancelEdit}>Cancel rename</Text></Pressable> : null}
             </View> : null}
             {currentCategory ? <View style={styles.archiveBlock}>
-              <Pressable disabled={saving || categories.length <= 1} onPress={() => confirmArchiveCategory(currentCategory)} style={[styles.archiveButton, categories.length <= 1 && styles.disabled]}>
+              <Pressable disabled={saving || categories.length <= 1} onPress={() => { void confirmArchiveCategory(currentCategory); }} style={[styles.archiveButton, categories.length <= 1 && styles.disabled]}>
                 <MaterialCommunityIcons color={colors.danger} name="archive-arrow-down-outline" size={19} />
                 <Text style={styles.archiveText}>Archive category</Text>
               </Pressable>
