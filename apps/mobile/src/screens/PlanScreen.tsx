@@ -1,5 +1,5 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ProgressBar } from '../components/ProgressBar';
 import { PlannedExpenseRow } from '../components/PlannedExpenseRow';
@@ -8,11 +8,13 @@ import { SavingsGoalRow } from '../components/SavingsGoalRow';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { colors, radius, spacing } from '../theme';
 import type { Category, PlannedExpense, RecurringBill, SavingsGoal } from '../types';
-import { formatMonth, plannedExpenseMonthlyAmount, savingsGoalMonthlyAmount } from '../utils/date';
+import { formatMonth, plannedExpenseMonthlyAmount, savingsGoalMonthlyAmount, shiftMonth } from '../utils/date';
 import { formatMoney } from '../utils/money';
 
 type PlanScreenProps = {
+  canCopyPreviousPlan: boolean;
   categories: Category[];
+  copyingPreviousPlan: boolean;
   income: number;
   month: string;
   bills: number;
@@ -22,6 +24,7 @@ type PlanScreenProps = {
   onAddBill: () => void;
   onAddPlannedExpense: () => void;
   onAddSavingsGoal: () => void;
+  onCopyPreviousPlan: () => void;
   onEdit: () => void;
   onEditBill: (bill: RecurringBill) => void;
   onEditPlannedExpense: (expense: PlannedExpense) => void;
@@ -34,7 +37,9 @@ type PlanScreenProps = {
 };
 
 export function PlanScreen({
+  canCopyPreviousPlan,
   categories,
+  copyingPreviousPlan,
   income,
   month,
   bills,
@@ -44,6 +49,7 @@ export function PlanScreen({
   onAddBill,
   onAddPlannedExpense,
   onAddSavingsGoal,
+  onCopyPreviousPlan,
   onEdit,
   onEditBill,
   onEditPlannedExpense,
@@ -68,6 +74,7 @@ export function PlanScreen({
   const plannedRatio = income > 0 ? Math.min(planned / income, 1) : 0;
   const recurringTotal = recurringBills.reduce((sum, bill) => sum + bill.amount, 0);
   const paidCount = recurringBills.filter((bill) => bill.paid).length;
+  const previousMonth = formatMonth(shiftMonth(month, -1), false);
 
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -85,6 +92,28 @@ export function PlanScreen({
           <Text style={styles.editText}>Edit</Text>
         </Pressable>
       </View>
+
+      {canCopyPreviousPlan ? (
+        <View style={styles.copyCard}>
+          <View style={styles.copyIcon}>
+            <MaterialCommunityIcons color={colors.primaryDark} name="content-copy" size={23} />
+          </View>
+          <View style={styles.copyTextBlock}>
+            <Text style={styles.copyTitle}>Start with {previousMonth}’s plan</Text>
+            <Text style={styles.copyDetail}>Copy income, fixed costs, and category limits. You can adjust anything afterward.</Text>
+          </View>
+          <Pressable
+            accessibilityLabel={`Copy ${previousMonth}'s plan`}
+            disabled={copyingPreviousPlan}
+            onPress={onCopyPreviousPlan}
+            style={[styles.copyButton, copyingPreviousPlan && styles.copyButtonDisabled]}
+          >
+            {copyingPreviousPlan
+              ? <ActivityIndicator color={colors.white} size="small" />
+              : <Text style={styles.copyButtonText}>Copy</Text>}
+          </Pressable>
+        </View>
+      ) : null}
 
       <View style={styles.planCard}>
         <View style={styles.planTop}>
@@ -289,6 +318,14 @@ const styles = StyleSheet.create({
   headerRow: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'space-between' },
   monthPicker: { alignItems: 'center', alignSelf: 'flex-start', flexDirection: 'row', gap: 4, marginTop: spacing.sm },
   monthText: { color: colors.primaryDark, fontSize: 12, fontWeight: '800' },
+  copyCard: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.md, flexDirection: 'row', gap: spacing.md, padding: spacing.lg },
+  copyIcon: { alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md, height: 44, justifyContent: 'center', width: 44 },
+  copyTextBlock: { flex: 1 },
+  copyTitle: { color: colors.primaryDark, fontSize: 14, fontWeight: '800' },
+  copyDetail: { color: colors.primaryDark, fontSize: 10, lineHeight: 15, marginTop: 3, opacity: 0.8 },
+  copyButton: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: radius.pill, minWidth: 66, paddingHorizontal: 14, paddingVertical: 10 },
+  copyButtonDisabled: { opacity: 0.55 },
+  copyButtonText: { color: colors.white, fontSize: 12, fontWeight: '800' },
   editButton: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.pill, flexDirection: 'row', gap: 5, marginTop: spacing.sm, paddingHorizontal: 12, paddingVertical: 9 },
   editText: { color: colors.primaryDark, fontSize: 12, fontWeight: '800' },
   planCard: { backgroundColor: colors.primaryDark, borderRadius: radius.lg, gap: spacing.lg, padding: spacing.xl },

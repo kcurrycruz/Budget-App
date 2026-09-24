@@ -2,7 +2,7 @@ import { FunctionsHttpError } from '@supabase/supabase-js';
 
 import { supabase } from '../lib/supabase';
 import type { Account, Category, CategoryDraft, ImportedTransactionDraft, ManualTransactionDraft, MerchantRule, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalContribution, SavingsGoalContributionDraft, SavingsGoalDraft, SpendingGroup, Transaction } from '../types';
-import { currentMonthStart, formatActivityDate, parseDateOnly, toDateOnly } from '../utils/date';
+import { currentMonthStart, formatActivityDate, parseDateOnly, shiftMonth, toDateOnly } from '../utils/date';
 
 export type CloudBudgetData = {
   accounts: Account[];
@@ -11,6 +11,7 @@ export type CloudBudgetData = {
   income: number;
   merchantRules: MerchantRule[];
   plannedExpenses: PlannedExpense[];
+  previousPlanAvailable: boolean;
   previousMonthToDateSpent: number;
   recurringBills: RecurringBill[];
   savingsGoals: SavingsGoal[];
@@ -189,10 +190,12 @@ export async function loadCloudBudget(monthStart = currentMonthStart()): Promise
   const client = requireClient();
   const { start, end, previousStart, previousEnd } = getMonthBounds(monthStart);
 
-  const [monthResult, categoriesResult, categoryBudgetsResult, subcategoriesResult, accountsResult, transactionsResult, previousTransactionsResult, billsResult, billPaymentsResult, merchantRulesResult, plannedExpensesResult, savingsGoalsResult, savingsGoalContributionsResult] = await Promise.all([
+  const [monthResult, previousMonthResult, categoriesResult, categoryBudgetsResult, previousCategoryBudgetsResult, subcategoriesResult, accountsResult, transactionsResult, previousTransactionsResult, billsResult, billPaymentsResult, merchantRulesResult, plannedExpensesResult, savingsGoalsResult, savingsGoalContributionsResult] = await Promise.all([
     client.from('budget_months').select('expected_income, fixed_costs').eq('month', start).maybeSingle(),
+    client.from('budget_months').select('expected_income, fixed_costs').eq('month', previousStart).maybeSingle(),
     client.from('categories').select('id, name, color, icon, monthly_limit, spending_group').is('archived_at', null).order('sort_order'),
     client.from('category_month_budgets').select('category_id, monthly_limit').eq('month', start),
+    client.from('category_month_budgets').select('monthly_limit').eq('month', previousStart),
     client.from('subcategories').select('id, category_id, name').is('archived_at', null).order('sort_order').order('name'),
     client.from('financial_accounts').select('id, display_name, institution_name, mask, account_type, current_balance, connection_status, plaid_item_id, last_synced_at').is('disconnected_at', null).order('created_at'),
     client.from('transactions').select('id, merchant_name, category_id, subcategory_id, financial_account_id, amount, direction, needs_review, transaction_date, pending, source, note').gte('transaction_date', start).lt('transaction_date', end).order('transaction_date', { ascending: false }).order('created_at', { ascending: false }),
@@ -205,7 +208,7 @@ export async function loadCloudBudget(monthStart = currentMonthStart()): Promise
     client.from('savings_goal_contributions').select('id, savings_goal_id, amount, note, contributed_on, created_at').lt('contributed_on', end).order('contributed_on', { ascending: false }).order('created_at', { ascending: false }),
   ]);
 
-  const error = monthResult.error ?? categoriesResult.error ?? categoryBudgetsResult.error ?? subcategoriesResult.error ?? accountsResult.error ?? transactionsResult.error ?? previousTransactionsResult.error
+  const error = monthResult.error ?? previousMonthResult.error ?? categoriesResult.error ?? categoryBudgetsResult.error ?? previousCategoryBudgetsResult.error ?? subcategoriesResult.error ?? accountsResult.error ?? transactionsResult.error ?? previousTransactionsResult.error
     ?? billsResult.error ?? billPaymentsResult.error ?? merchantRulesResult.error ?? plannedExpensesResult.error ?? savingsGoalsResult.error ?? savingsGoalContributionsResult.error;
   if (error) throw error;
 
@@ -302,6 +305,9 @@ export async function loadCloudBudget(monthStart = currentMonthStart()): Promise
   const previousMonthToDateSpent = previousTransactionRows
     .filter((transaction) => transaction.direction === 'outflow')
     .reduce((sum, transaction) => sum + Number(transaction.amount), 0);
+  const previousPlanAvailable = Number(previousMonthResult.data?.expected_income ?? 0) > 0
+    || Number(previousMonthResult.data?.fixed_costs ?? 0) > 0
+    || (previousCategoryBudgetsResult.data ?? []).some((budget) => Number(budget.monthly_limit) > 0);
 
   return {
     accounts,
@@ -310,6 +316,7 @@ export async function loadCloudBudget(monthStart = currentMonthStart()): Promise
     income: Number(monthResult.data?.expected_income ?? 0),
     merchantRules: merchantRuleRows.map(mapMerchantRule),
     plannedExpenses: plannedExpenseRows.map(mapPlannedExpense),
+    previousPlanAvailable,
     previousMonthToDateSpent,
     recurringBills,
     savingsGoals: savingsGoalRows.map((goal) => mapSavingsGoal(goal, contributionsByGoal.get(goal.id) ?? [])),
@@ -763,6 +770,42 @@ export async function saveMonthlyPlan(input: {
     );
     if (categoryError) throw categoryError;
   }
+}
+
+export async function copyPreviousMonthPlan(input: { month: string; userId: string }) {
+  const client = requireClient();
+  const previousMonth = shiftMonth(input.month, -1);
+  const [sourceMonthResult, sourceCategoriesResult, targetMonthResult, targetCategoriesResult] = await Promise.all([
+    client.from('budget_months').select('expected_income, fixed_costs').eq('month', previousMonth).maybeSingle(),
+    client.from('category_month_budgets').select('category_id, monthly_limit').eq('month', previousMonth),
+    client.from('budget_months').select('expected_income, fixed_costs').eq('month', input.month).maybeSingle(),
+    client.from('category_month_budgets').select('monthly_limit').eq('month', input.month),
+  ]);
+  const error = sourceMonthResult.error ?? sourceCategoriesResult.error ?? targetMonthResult.error ?? targetCategoriesResult.error;
+  if (error) throw error;
+
+  const targetHasPlan = Number(targetMonthResult.data?.expected_income ?? 0) > 0
+    || Number(targetMonthResult.data?.fixed_costs ?? 0) > 0
+    || (targetCategoriesResult.data ?? []).some((budget) => Number(budget.monthly_limit) > 0);
+  if (targetHasPlan) throw new Error('This month already has a plan. Edit it instead of copying over it.');
+
+  const sourceCategories = (sourceCategoriesResult.data ?? []) as CategoryMonthBudgetRow[];
+  const income = Number(sourceMonthResult.data?.expected_income ?? 0);
+  const bills = Number(sourceMonthResult.data?.fixed_costs ?? 0);
+  if (income === 0 && bills === 0 && !sourceCategories.some((category) => Number(category.monthly_limit) > 0)) {
+    throw new Error('There is no plan in the previous month to copy.');
+  }
+
+  const categories = sourceCategories.map((category) => ({
+    id: category.category_id,
+    budget: Number(category.monthly_limit),
+  }));
+  await saveMonthlyPlan({ bills, categories, income, month: input.month, userId: input.userId });
+  return {
+    bills,
+    categoryBudgets: Object.fromEntries(categories.map((category) => [category.id, category.budget])),
+    income,
+  };
 }
 
 export async function exportCloudBudget() {

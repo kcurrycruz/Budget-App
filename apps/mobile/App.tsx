@@ -15,6 +15,7 @@ import { ReviewTransactionModal } from './src/components/ReviewTransactionModal'
 import { SavingsGoalModal } from './src/components/SavingsGoalModal';
 import {
   categorizeTransaction,
+  copyPreviousMonthPlan,
   createCategory as createBudgetCategory,
   createManualTransaction,
   createPlannedExpense,
@@ -148,6 +149,7 @@ function BudgetApp({ session }: BudgetAppProps) {
   const [income, setIncome] = useState(cloudMode ? 0 : monthlyIncome);
   const [bills, setBills] = useState(cloudMode ? 0 : monthlyBills);
   const [previousMonthToDateSpent, setPreviousMonthToDateSpent] = useState(cloudMode ? 0 : demoPreviousMonthToDateSpent);
+  const [previousPlanAvailable, setPreviousPlanAvailable] = useState(false);
   const [merchantRules, setMerchantRules] = useState<MerchantRule[]>([]);
   const [plannedExpenses, setPlannedExpenses] = useState<PlannedExpense[]>(cloudMode ? [] : initialPlannedExpenses);
   const [recurringBills, setRecurringBills] = useState<RecurringBill[]>(cloudMode ? [] : initialRecurringBills);
@@ -158,6 +160,7 @@ function BudgetApp({ session }: BudgetAppProps) {
   const [addSaving, setAddSaving] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [planEditing, setPlanEditing] = useState(forcePlanPreview);
+  const [planCopying, setPlanCopying] = useState(false);
   const [billOpen, setBillOpen] = useState(false);
   const [billSaving, setBillSaving] = useState(false);
   const [editingBill, setEditingBill] = useState<RecurringBill | null>(null);
@@ -195,6 +198,7 @@ function BudgetApp({ session }: BudgetAppProps) {
       setPreviousMonthToDateSpent(data.previousMonthToDateSpent);
       setMerchantRules(data.merchantRules);
       setPlannedExpenses(data.plannedExpenses);
+      setPreviousPlanAvailable(data.previousPlanAvailable);
       setRecurringBills(data.recurringBills);
       setSavingsGoals(data.savingsGoals);
     } catch (caught) {
@@ -336,6 +340,24 @@ function BudgetApp({ session }: BudgetAppProps) {
     setIncome(input.income);
     setCategories((current) => current.map((category) => ({ ...category, budget: input.categoryBudgets[category.id] ?? 0 })));
     setPlanEditing(false);
+  };
+
+  const copyPreviousPlan = async () => {
+    if (!session || planCopying) return;
+    setPlanCopying(true);
+    try {
+      const copied = await copyPreviousMonthPlan({ month: selectedMonth, userId: session.user.id });
+      setBills(copied.bills);
+      setIncome(copied.income);
+      setCategories((current) => current.map((category) => ({
+        ...category,
+        budget: copied.categoryBudgets[category.id] ?? 0,
+      })));
+    } catch (caught) {
+      Alert.alert('Could not copy the plan', caught instanceof Error ? caught.message : 'Please try again.');
+    } finally {
+      setPlanCopying(false);
+    }
   };
 
   const openRecurringBill = (bill?: RecurringBill) => {
@@ -783,6 +805,7 @@ function BudgetApp({ session }: BudgetAppProps) {
 
   const needsPlanSetup = session
     && selectedMonth === currentMonthStart()
+    && !previousPlanAvailable
     && (income === 0 || categories.every((category) => category.budget === 0));
   if ((session && needsPlanSetup) || planEditing) {
     return (
@@ -838,7 +861,9 @@ function BudgetApp({ session }: BudgetAppProps) {
         return (
           <PlanScreen
             bills={bills}
+            canCopyPreviousPlan={previousPlanAvailable && income === 0 && bills === 0 && categories.every((category) => category.budget === 0)}
             categories={categories}
+            copyingPreviousPlan={planCopying}
             income={income}
             month={selectedMonth}
             onAddBill={() => openRecurringBill()}
@@ -850,6 +875,7 @@ function BudgetApp({ session }: BudgetAppProps) {
             onEditSavingsGoal={openSavingsGoal}
             onManageCategories={() => setCategoryManagerOpen(true)}
             onOpenCashFlow={() => setCashFlowOpen(true)}
+            onCopyPreviousPlan={() => { void copyPreviousPlan(); }}
             onSelectMonth={() => setMonthPickerOpen(true)}
             onToggleBillPaid={(bill) => { void toggleRecurringBillPaid(bill); }}
             onTogglePlannedExpenseCovered={(expense) => { void togglePlannedExpenseCovered(expense); }}

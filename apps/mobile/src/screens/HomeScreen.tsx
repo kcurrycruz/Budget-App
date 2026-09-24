@@ -50,10 +50,11 @@ export function HomeScreen({
   previewMode = false,
 }: HomeScreenProps) {
   const spent = categories.reduce((total, category) => total + category.spent, 0);
+  const hasPlan = income > 0 || categories.some((category) => category.budget > 0);
   const plannedSetAside = plannedExpenses
     .filter((expense) => !expense.covered)
     .reduce((sum, expense) => sum + plannedExpenseMonthlyAmount(expense.amount, expense.targetMonth, month), 0);
-  const left = income - spent - plannedSetAside;
+  const left = hasPlan ? income - spent - plannedSetAside : 0;
   const upcomingBills = recurringBills.filter((bill) => !bill.paid).slice(0, 3);
   const upcomingExpenses = plannedExpenses.filter((expense) => !expense.covered).slice(0, 2);
   const paidBills = recurringBills.filter((bill) => bill.paid).length;
@@ -91,12 +92,12 @@ export function HomeScreen({
       <View style={styles.balanceCard}>
         <View style={styles.balanceTop}>
           <View>
-            <Text style={styles.balanceLabel}>Available this month</Text>
+            <Text style={styles.balanceLabel}>{hasPlan ? 'Available this month' : 'This month needs a plan'}</Text>
             <Text style={styles.balanceValue}>{formatMoney(left)}</Text>
           </View>
           <View style={styles.statusPill}>
             <View style={styles.statusDot} />
-            <Text style={styles.statusText}>On track</Text>
+            <Text style={styles.statusText}>{hasPlan ? 'On track' : 'Plan needed'}</Text>
           </View>
         </View>
         <ProgressBar color={colors.accent} height={10} value={(spent + plannedSetAside) / income} />
