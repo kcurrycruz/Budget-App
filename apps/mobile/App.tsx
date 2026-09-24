@@ -902,6 +902,7 @@ function BudgetApp({ session }: BudgetAppProps) {
             onViewTransactions={() => changeTab('transactions')}
             previewMode={!isCloudConfigured}
             plannedExpenses={plannedExpenses}
+            previousMonthSpent={previousMonthToDateSpent}
             transactions={transactions}
             recurringBills={recurringBills}
             userInitials={userInitials}

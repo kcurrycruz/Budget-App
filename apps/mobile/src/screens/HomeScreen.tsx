@@ -2,6 +2,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ProgressBar } from '../components/ProgressBar';
+import { MonthlyInsightsCard } from '../components/MonthlyInsightsCard';
 import { PlannedExpenseRow } from '../components/PlannedExpenseRow';
 import { RecurringBillRow } from '../components/RecurringBillRow';
 import { TransactionRow } from '../components/TransactionRow';
@@ -16,6 +17,7 @@ type HomeScreenProps = {
   income: number;
   month: string;
   plannedExpenses: PlannedExpense[];
+  previousMonthSpent: number;
   recurringBills: RecurringBill[];
   onAdd: () => void;
   onConnect: () => void;
@@ -36,6 +38,7 @@ export function HomeScreen({
   income,
   month,
   plannedExpenses,
+  previousMonthSpent,
   recurringBills,
   onAdd,
   onConnect,
@@ -49,7 +52,11 @@ export function HomeScreen({
   userInitials = 'KC',
   previewMode = false,
 }: HomeScreenProps) {
-  const spent = categories.reduce((total, category) => total + category.spent, 0);
+  const categorizedSpent = categories.reduce((total, category) => total + category.spent, 0);
+  const transactionSpent = transactions
+    .filter((transaction) => (transaction.direction ?? 'outflow') === 'outflow')
+    .reduce((total, transaction) => total + transaction.amount, 0);
+  const spent = Math.max(categorizedSpent, transactionSpent);
   const hasPlan = income > 0 || categories.some((category) => category.budget > 0);
   const plannedSetAside = plannedExpenses
     .filter((expense) => !expense.covered)
@@ -119,6 +126,8 @@ export function HomeScreen({
           <Text style={styles.secondaryActionText}>Connect</Text>
         </Pressable>
       </View>
+
+      <MonthlyInsightsCard categories={categories} currentMonthSpent={spent} month={month} previousMonthSpent={previousMonthSpent} />
 
       <View style={styles.sectionHeader}>
         <View>
