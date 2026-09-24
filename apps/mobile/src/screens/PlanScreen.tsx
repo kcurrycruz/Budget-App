@@ -7,7 +7,7 @@ import { RecurringBillRow } from '../components/RecurringBillRow';
 import { SavingsGoalRow } from '../components/SavingsGoalRow';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { colors, radius, spacing } from '../theme';
-import type { Category, PlannedExpense, RecurringBill, SavingsGoal } from '../types';
+import type { Category, PlannedExpense, RecurringBill, SavingsGoal, SubscriptionSuggestion } from '../types';
 import { formatMonth, plannedExpenseMonthlyAmount, savingsGoalMonthlyAmount, shiftMonth } from '../utils/date';
 import { formatMoney } from '../utils/money';
 
@@ -21,6 +21,8 @@ type PlanScreenProps = {
   plannedExpenses: PlannedExpense[];
   recurringBills: RecurringBill[];
   savingsGoals: SavingsGoal[];
+  subscriptionSuggestions: SubscriptionSuggestion[];
+  dismissingSuggestion?: string | null;
   onAddBill: () => void;
   onAddPlannedExpense: () => void;
   onAddSavingsGoal: () => void;
@@ -32,6 +34,8 @@ type PlanScreenProps = {
   onManageCategories: () => void;
   onOpenCashFlow: () => void;
   onSelectMonth: () => void;
+  onAddSubscriptionSuggestion: (suggestion: SubscriptionSuggestion) => void;
+  onDismissSubscriptionSuggestion: (suggestion: SubscriptionSuggestion) => void;
   onToggleBillPaid: (bill: RecurringBill) => void;
   onTogglePlannedExpenseCovered: (expense: PlannedExpense) => void;
 };
@@ -46,6 +50,8 @@ export function PlanScreen({
   plannedExpenses,
   recurringBills,
   savingsGoals,
+  subscriptionSuggestions,
+  dismissingSuggestion,
   onAddBill,
   onAddPlannedExpense,
   onAddSavingsGoal,
@@ -57,6 +63,8 @@ export function PlanScreen({
   onManageCategories,
   onOpenCashFlow,
   onSelectMonth,
+  onAddSubscriptionSuggestion,
+  onDismissSubscriptionSuggestion,
   onToggleBillPaid,
   onTogglePlannedExpenseCovered,
 }: PlanScreenProps) {
@@ -195,6 +203,52 @@ export function PlanScreen({
           </View>
         </Pressable>
       )}
+
+      {subscriptionSuggestions.length ? (
+        <View style={styles.suggestionSection}>
+          <View>
+            <Text style={styles.suggestionTitle}>Possible subscriptions</Text>
+            <Text style={styles.sectionCaption}>Repeating monthly charges Zenify found</Text>
+          </View>
+          <View style={styles.suggestionList}>
+            {subscriptionSuggestions.map((suggestion, index) => {
+              const dismissing = dismissingSuggestion === suggestion.merchantKey;
+              return (
+                <View key={suggestion.merchantKey}>
+                  <View style={styles.suggestionRow}>
+                    <View style={styles.suggestionIcon}>
+                      <MaterialCommunityIcons color={colors.primary} name="autorenew" size={20} />
+                    </View>
+                    <View style={styles.suggestionCopy}>
+                      <Text numberOfLines={1} style={styles.suggestionName}>{suggestion.merchantName}</Text>
+                      <Text style={styles.suggestionDetail}>Seen {suggestion.occurrenceCount} times · about {formatMoney(suggestion.amount)}/month</Text>
+                    </View>
+                    <Pressable
+                      accessibilityLabel={`Dismiss ${suggestion.merchantName} suggestion`}
+                      disabled={dismissing}
+                      onPress={() => onDismissSubscriptionSuggestion(suggestion)}
+                      style={styles.dismissSuggestion}
+                    >
+                      {dismissing
+                        ? <ActivityIndicator color={colors.inkMuted} size="small" />
+                        : <MaterialCommunityIcons color={colors.inkMuted} name="close" size={19} />}
+                    </Pressable>
+                    <Pressable
+                      accessibilityLabel={`Add ${suggestion.merchantName} as a recurring bill`}
+                      onPress={() => onAddSubscriptionSuggestion(suggestion)}
+                      style={styles.addSuggestion}
+                    >
+                      <Text style={styles.addSuggestionText}>Review</Text>
+                    </Pressable>
+                  </View>
+                  {index < subscriptionSuggestions.length - 1 ? <View style={styles.suggestionDivider} /> : null}
+                </View>
+              );
+            })}
+          </View>
+          <Text style={styles.suggestionFootnote}>Nothing is added automatically. You stay in control.</Text>
+        </View>
+      ) : null}
 
       <View style={styles.sectionTitleRow}>
         <View>
@@ -360,6 +414,19 @@ const styles = StyleSheet.create({
   emptyBillCopy: { flex: 1, gap: 3 },
   emptyBillTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
   emptyBillDetail: { color: colors.inkMuted, fontSize: 11, lineHeight: 16 },
+  suggestionSection: { gap: spacing.md },
+  suggestionTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' },
+  suggestionList: { backgroundColor: colors.primarySoft, borderRadius: radius.md, paddingHorizontal: spacing.md },
+  suggestionRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, minHeight: 68, paddingVertical: spacing.md },
+  suggestionIcon: { alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.pill, height: 36, justifyContent: 'center', width: 36 },
+  suggestionCopy: { flex: 1 },
+  suggestionName: { color: colors.ink, fontSize: 13, fontWeight: '800' },
+  suggestionDetail: { color: colors.inkMuted, fontSize: 10, lineHeight: 15, marginTop: 2 },
+  dismissSuggestion: { alignItems: 'center', height: 34, justifyContent: 'center', width: 30 },
+  addSuggestion: { backgroundColor: colors.primary, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 9 },
+  addSuggestionText: { color: colors.white, fontSize: 11, fontWeight: '800' },
+  suggestionDivider: { backgroundColor: colors.border, height: StyleSheet.hairlineWidth, marginLeft: 44 },
+  suggestionFootnote: { color: colors.inkMuted, fontSize: 10, lineHeight: 15 },
   categoryList: { backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.lg },
   categoryRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.lg },
   icon: { alignItems: 'center', borderRadius: radius.md, height: 42, justifyContent: 'center', width: 42 },

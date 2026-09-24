@@ -703,6 +703,35 @@ export type Database = {
           },
         ]
       }
+      subscription_suggestion_dismissals: {
+        Row: {
+          created_at: string
+          id: string
+          merchant_key: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          merchant_key: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          merchant_key?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_suggestion_dismissals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transactions: {
         Row: {
           amount: number

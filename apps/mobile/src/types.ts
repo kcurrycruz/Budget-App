@@ -127,6 +127,15 @@ export type RecurringBillDraft = {
   categoryId?: string;
 };
 
+export type SubscriptionSuggestion = {
+  merchantKey: string;
+  merchantName: string;
+  amount: number;
+  dueDay: number;
+  categoryId?: string;
+  occurrenceCount: number;
+};
+
 export type Account = {
   id: string;
   name: string;

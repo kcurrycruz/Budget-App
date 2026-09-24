@@ -27,7 +27,7 @@ Product name: **Zenify**. Brand promise: **Unifying all finances in one place to
 
 - Whether the first budgeting model is category limits, zero-based budgeting, or a simpler spend-versus-income plan.
 - Which spreadsheet tabs and fields must be migrated into the app.
-- Whether recurring bills should be detected automatically or entered manually first.
+- Recurring bills can be entered manually, while stable monthly transaction patterns appear as optional review-first suggestions.
 - Authentication, data-retention, deletion, and support requirements.
 
 ## Future feature and UI backlog
@@ -129,3 +129,4 @@ Record decisions here with the date, decision, and reason. Move longer technical
 - 2026-09-23: Accounts shows an estimated net worth from connected balances only. Cash and investment accounts count toward assets, credit and loan balances count toward debt, and negative cash balances are treated as debt so the summary remains conservative.
 - 2026-09-23: Account settings includes a CSV round-trip for transactions. Zenify validates required fields, skips exact duplicates, limits each import to 500 rows, and sends unknown expense categories to the Review queue instead of guessing.
 - 2026-09-24: Home shows a compact monthly-insights card only when spending exists. It prioritizes overspending, month-to-month direction, and the largest category while keeping deeper analysis inside the cash-flow report.
+- 2026-09-24: Subscription detection only suggests merchants with at least two stable charges 20–40 days apart. Zenify never creates a recurring bill automatically; the user reviews every suggestion, and dismissed suggestions remain private to that account.

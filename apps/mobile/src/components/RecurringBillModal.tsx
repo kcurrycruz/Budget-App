@@ -19,6 +19,7 @@ import { formatMoneyInput, parseMoneyInput } from '../utils/money';
 type RecurringBillModalProps = {
   categories: Category[];
   initialBill?: RecurringBill | null;
+  initialDraft?: RecurringBillDraft | null;
   onClose: () => void;
   onDelete?: () => void;
   onSave: (draft: RecurringBillDraft) => void;
@@ -29,6 +30,7 @@ type RecurringBillModalProps = {
 export function RecurringBillModal({
   categories,
   initialBill,
+  initialDraft,
   onClose,
   onDelete,
   onSave,
@@ -46,13 +48,18 @@ export function RecurringBillModal({
       setAmount(formatMoneyInput(String(initialBill.amount)));
       setDueDay(String(initialBill.dueDay));
       setCategoryId(initialBill.categoryId ?? '');
+    } else if (visible && initialDraft) {
+      setName(initialDraft.name);
+      setAmount(formatMoneyInput(String(initialDraft.amount)));
+      setDueDay(String(initialDraft.dueDay));
+      setCategoryId(initialDraft.categoryId ?? '');
     } else if (!visible) {
       setName('');
       setAmount('');
       setDueDay('1');
       setCategoryId('');
     }
-  }, [initialBill, visible]);
+  }, [initialBill, initialDraft, visible]);
 
   const numericAmount = parseMoneyInput(amount);
   const numericDueDay = Number(dueDay);
@@ -81,7 +88,7 @@ export function RecurringBillModal({
             <Pressable accessibilityLabel="Close bill entry" disabled={saving} onPress={onClose} style={styles.closeButton}>
               <MaterialCommunityIcons color={colors.ink} name="close" size={22} />
             </Pressable>
-            <Text style={styles.title}>{initialBill ? 'Edit recurring bill' : 'Add recurring bill'}</Text>
+            <Text style={styles.title}>{initialBill ? 'Edit recurring bill' : initialDraft ? 'Review subscription' : 'Add recurring bill'}</Text>
             <View style={styles.headerSpacer} />
           </View>
 
@@ -167,7 +174,11 @@ export function RecurringBillModal({
 
           <View style={styles.infoCard}>
             <MaterialCommunityIcons color={colors.primary} name="information-outline" size={21} />
-            <Text style={styles.infoText}>Adding details here does not change your fixed-cost plan total. It helps you see what is due and what is paid.</Text>
+            <Text style={styles.infoText}>
+              {initialDraft
+                ? 'Zenify found a repeating charge. Review the amount and date before adding it to your recurring bills.'
+                : 'Adding details here does not change your fixed-cost plan total. It helps you see what is due and what is paid.'}
+            </Text>
           </View>
 
           <Pressable disabled={!canSave} onPress={save} style={[styles.saveButton, !canSave && styles.saveButtonDisabled]}>

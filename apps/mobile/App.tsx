@@ -29,6 +29,7 @@ import {
   deleteRecurringBill,
   deleteSavingsGoal,
   deleteSavingsGoalContribution,
+  dismissSubscriptionSuggestion,
   exportCloudBudget,
   importManualTransactions,
   loadCloudBudget,
@@ -55,7 +56,7 @@ import { PlanSetupScreen } from './src/screens/PlanSetupScreen';
 import { TransactionsScreen } from './src/screens/TransactionsScreen';
 import { UpdatePasswordScreen } from './src/screens/UpdatePasswordScreen';
 import { colors } from './src/theme';
-import type { AppTab, Category, CategoryDraft, ImportedTransactionDraft, ManualTransactionDraft, MerchantRule, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalContribution, SavingsGoalContributionDraft, SavingsGoalDraft, Subcategory, Transaction } from './src/types';
+import type { AppTab, Category, CategoryDraft, ImportedTransactionDraft, ManualTransactionDraft, MerchantRule, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalContribution, SavingsGoalContributionDraft, SavingsGoalDraft, Subcategory, SubscriptionSuggestion, Transaction } from './src/types';
 import { currentMonthStart, formatActivityDate, toDateOnly } from './src/utils/date';
 import { formatMoney } from './src/utils/money';
 import { useReducedMotion } from './src/utils/useReducedMotion';
@@ -153,6 +154,7 @@ function BudgetApp({ session }: BudgetAppProps) {
   const [merchantRules, setMerchantRules] = useState<MerchantRule[]>([]);
   const [plannedExpenses, setPlannedExpenses] = useState<PlannedExpense[]>(cloudMode ? [] : initialPlannedExpenses);
   const [recurringBills, setRecurringBills] = useState<RecurringBill[]>(cloudMode ? [] : initialRecurringBills);
+  const [subscriptionSuggestions, setSubscriptionSuggestions] = useState<SubscriptionSuggestion[]>([]);
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>(cloudMode ? [] : initialSavingsGoals);
   const [dataLoading, setDataLoading] = useState(cloudMode);
   const [dataError, setDataError] = useState<string | null>(null);
@@ -164,6 +166,9 @@ function BudgetApp({ session }: BudgetAppProps) {
   const [billOpen, setBillOpen] = useState(false);
   const [billSaving, setBillSaving] = useState(false);
   const [editingBill, setEditingBill] = useState<RecurringBill | null>(null);
+  const [suggestedBillDraft, setSuggestedBillDraft] = useState<RecurringBillDraft | null>(null);
+  const [addingSuggestionKey, setAddingSuggestionKey] = useState<string | null>(null);
+  const [dismissingSuggestion, setDismissingSuggestion] = useState<string | null>(null);
   const [plannedExpenseOpen, setPlannedExpenseOpen] = useState(false);
   const [plannedExpenseSaving, setPlannedExpenseSaving] = useState(false);
   const [editingPlannedExpense, setEditingPlannedExpense] = useState<PlannedExpense | null>(null);
@@ -200,6 +205,7 @@ function BudgetApp({ session }: BudgetAppProps) {
       setPlannedExpenses(data.plannedExpenses);
       setPreviousPlanAvailable(data.previousPlanAvailable);
       setRecurringBills(data.recurringBills);
+      setSubscriptionSuggestions(data.subscriptionSuggestions);
       setSavingsGoals(data.savingsGoals);
     } catch (caught) {
       setDataError(caught instanceof Error ? caught.message : 'Your cloud budget could not be loaded.');
@@ -362,7 +368,34 @@ function BudgetApp({ session }: BudgetAppProps) {
 
   const openRecurringBill = (bill?: RecurringBill) => {
     setEditingBill(bill ?? null);
+    setSuggestedBillDraft(null);
+    setAddingSuggestionKey(null);
     setBillOpen(true);
+  };
+
+  const openSubscriptionSuggestion = (suggestion: SubscriptionSuggestion) => {
+    setEditingBill(null);
+    setSuggestedBillDraft({
+      name: suggestion.merchantName,
+      amount: suggestion.amount,
+      dueDay: suggestion.dueDay,
+      categoryId: suggestion.categoryId,
+    });
+    setAddingSuggestionKey(suggestion.merchantKey);
+    setBillOpen(true);
+  };
+
+  const dismissSuggestedSubscription = async (suggestion: SubscriptionSuggestion) => {
+    if (dismissingSuggestion) return;
+    setDismissingSuggestion(suggestion.merchantKey);
+    try {
+      if (session) await dismissSubscriptionSuggestion(suggestion.merchantKey);
+      setSubscriptionSuggestions((current) => current.filter((item) => item.merchantKey !== suggestion.merchantKey));
+    } catch (caught) {
+      Alert.alert('Could not dismiss suggestion', caught instanceof Error ? caught.message : 'Please try again.');
+    } finally {
+      setDismissingSuggestion(null);
+    }
   };
 
   const saveRecurringBill = async (draft: RecurringBillDraft) => {
@@ -381,9 +414,14 @@ function BudgetApp({ session }: BudgetAppProps) {
           : { id: `bill-${Date.now()}`, ...draft, paid: false } satisfies RecurringBill;
         setRecurringBills((current) => [...current, saved]
           .sort((left, right) => left.dueDay - right.dueDay || left.name.localeCompare(right.name)));
+        if (addingSuggestionKey) {
+          setSubscriptionSuggestions((current) => current.filter((suggestion) => suggestion.merchantKey !== addingSuggestionKey));
+        }
       }
       setBillOpen(false);
       setEditingBill(null);
+      setSuggestedBillDraft(null);
+      setAddingSuggestionKey(null);
     } catch (caught) {
       Alert.alert('Could not save recurring bill', caught instanceof Error ? caught.message : 'Please try again.');
     } finally {
@@ -879,9 +917,13 @@ function BudgetApp({ session }: BudgetAppProps) {
             onSelectMonth={() => setMonthPickerOpen(true)}
             onToggleBillPaid={(bill) => { void toggleRecurringBillPaid(bill); }}
             onTogglePlannedExpenseCovered={(expense) => { void togglePlannedExpenseCovered(expense); }}
+            onAddSubscriptionSuggestion={openSubscriptionSuggestion}
+            onDismissSubscriptionSuggestion={(suggestion) => { void dismissSuggestedSubscription(suggestion); }}
             plannedExpenses={plannedExpenses}
             recurringBills={recurringBills}
             savingsGoals={savingsGoals}
+            subscriptionSuggestions={selectedMonth === currentMonthStart() ? subscriptionSuggestions : []}
+            dismissingSuggestion={dismissingSuggestion}
           />
         );
       case 'connect':
@@ -932,9 +974,12 @@ function BudgetApp({ session }: BudgetAppProps) {
       <RecurringBillModal
         categories={categories}
         initialBill={editingBill}
+        initialDraft={suggestedBillDraft}
         onClose={() => {
           setBillOpen(false);
           setEditingBill(null);
+          setSuggestedBillDraft(null);
+          setAddingSuggestionKey(null);
         }}
         onDelete={editingBill ? confirmDeleteRecurringBill : undefined}
         onSave={(draft) => { void saveRecurringBill(draft); }}

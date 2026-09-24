@@ -1,7 +1,7 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
 
 import { supabase } from '../lib/supabase';
-import type { Account, Category, CategoryDraft, ImportedTransactionDraft, ManualTransactionDraft, MerchantRule, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalContribution, SavingsGoalContributionDraft, SavingsGoalDraft, SpendingGroup, Transaction } from '../types';
+import type { Account, Category, CategoryDraft, ImportedTransactionDraft, ManualTransactionDraft, MerchantRule, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalContribution, SavingsGoalContributionDraft, SavingsGoalDraft, SpendingGroup, SubscriptionSuggestion, Transaction } from '../types';
 import { currentMonthStart, formatActivityDate, parseDateOnly, shiftMonth, toDateOnly } from '../utils/date';
 
 export type CloudBudgetData = {
@@ -15,6 +15,7 @@ export type CloudBudgetData = {
   previousMonthToDateSpent: number;
   recurringBills: RecurringBill[];
   savingsGoals: SavingsGoal[];
+  subscriptionSuggestions: SubscriptionSuggestion[];
   transactions: Transaction[];
 };
 
@@ -57,6 +58,12 @@ type TransactionRow = {
   source: 'manual' | 'plaid';
   note: string | null;
   subcategory_id: string | null;
+};
+
+type SubscriptionHistoryRow = Pick<TransactionRow, 'amount' | 'category_id' | 'merchant_name' | 'transaction_date'>;
+
+type SubscriptionDismissalRow = {
+  merchant_key: string;
 };
 
 type SubcategoryRow = {
@@ -147,6 +154,69 @@ const mapSavingsGoal = (goal: SavingsGoalRow, contributions: SavingsGoalContribu
   contributions,
 });
 
+const normalizeMerchantKey = (value: string) => value
+  .trim()
+  .toLocaleLowerCase()
+  .replace(/[^a-z0-9]+/g, ' ')
+  .trim()
+  .slice(0, 160);
+
+const daysBetween = (left: string, right: string) => Math.round(
+  (parseDateOnly(right).getTime() - parseDateOnly(left).getTime()) / 86_400_000,
+);
+
+const detectSubscriptionSuggestions = (
+  transactions: SubscriptionHistoryRow[],
+  recurringBills: RecurringBill[],
+  dismissedKeys: Set<string>,
+): SubscriptionSuggestion[] => {
+  const existingBillKeys = new Set(recurringBills.map((bill) => normalizeMerchantKey(bill.name)));
+  const groups = new Map<string, SubscriptionHistoryRow[]>();
+
+  for (const transaction of transactions) {
+    const merchantKey = normalizeMerchantKey(transaction.merchant_name);
+    if (!merchantKey || dismissedKeys.has(merchantKey) || existingBillKeys.has(merchantKey)) continue;
+    groups.set(merchantKey, [...(groups.get(merchantKey) ?? []), transaction]);
+  }
+
+  return [...groups.entries()].flatMap(([merchantKey, rows]) => {
+    const sorted = [...rows].sort((left, right) => left.transaction_date.localeCompare(right.transaction_date));
+    if (sorted.length < 2) return [];
+
+    const newest = sorted.at(-1);
+    if (!newest) return [];
+    const chain: SubscriptionHistoryRow[] = [newest];
+    for (let index = sorted.length - 2; index >= 0 && chain.length < 4; index -= 1) {
+      const candidate = sorted[index];
+      const nextCharge = chain[0];
+      if (!candidate || !nextCharge) continue;
+      const gap = daysBetween(candidate.transaction_date, nextCharge.transaction_date);
+      if (gap >= 20 && gap <= 40) chain.unshift(candidate);
+      else if (gap > 40) break;
+    }
+    if (chain.length < 2) return [];
+
+    const average = chain.reduce((sum, row) => sum + Number(row.amount), 0) / chain.length;
+    const tolerance = Math.max(2, average * 0.15);
+    if (chain.some((row) => Math.abs(Number(row.amount) - average) > tolerance)) return [];
+
+    const latest = chain.at(-1);
+    if (!latest) return [];
+    return [{
+      merchantKey,
+      merchantName: latest.merchant_name.trim(),
+      amount: Math.round(average * 100) / 100,
+      dueDay: parseDateOnly(latest.transaction_date).getDate(),
+      categoryId: latest.category_id ?? undefined,
+      occurrenceCount: chain.length,
+    }];
+  }).sort((left, right) => (
+    right.occurrenceCount - left.occurrenceCount
+    || right.amount - left.amount
+    || left.merchantName.localeCompare(right.merchantName)
+  )).slice(0, 3);
+};
+
 const getMonthBounds = (monthStart = currentMonthStart()) => {
   const now = new Date();
   const start = parseDateOnly(monthStart);
@@ -189,8 +259,11 @@ const invokeFunction = async <T>(name: string, body: Record<string, unknown> = {
 export async function loadCloudBudget(monthStart = currentMonthStart()): Promise<CloudBudgetData> {
   const client = requireClient();
   const { start, end, previousStart, previousEnd } = getMonthBounds(monthStart);
+  const historyStartDate = new Date();
+  historyStartDate.setDate(historyStartDate.getDate() - 180);
+  const historyStart = toDateOnly(historyStartDate);
 
-  const [monthResult, previousMonthResult, categoriesResult, categoryBudgetsResult, previousCategoryBudgetsResult, subcategoriesResult, accountsResult, transactionsResult, previousTransactionsResult, billsResult, billPaymentsResult, merchantRulesResult, plannedExpensesResult, savingsGoalsResult, savingsGoalContributionsResult] = await Promise.all([
+  const [monthResult, previousMonthResult, categoriesResult, categoryBudgetsResult, previousCategoryBudgetsResult, subcategoriesResult, accountsResult, transactionsResult, previousTransactionsResult, billsResult, billPaymentsResult, merchantRulesResult, plannedExpensesResult, savingsGoalsResult, savingsGoalContributionsResult, subscriptionHistoryResult, subscriptionDismissalsResult] = await Promise.all([
     client.from('budget_months').select('expected_income, fixed_costs').eq('month', start).maybeSingle(),
     client.from('budget_months').select('expected_income, fixed_costs').eq('month', previousStart).maybeSingle(),
     client.from('categories').select('id, name, color, icon, monthly_limit, spending_group').is('archived_at', null).order('sort_order'),
@@ -206,10 +279,13 @@ export async function loadCloudBudget(monthStart = currentMonthStart()): Promise
     client.from('planned_expenses').select('id, name, amount, target_month, category_id, covered_at').order('target_month').order('name'),
     client.from('savings_goals').select('id, name, target_amount, current_amount, target_month').order('target_month').order('name'),
     client.from('savings_goal_contributions').select('id, savings_goal_id, amount, note, contributed_on, created_at').lt('contributed_on', end).order('contributed_on', { ascending: false }).order('created_at', { ascending: false }),
+    client.from('transactions').select('merchant_name, category_id, amount, transaction_date').eq('direction', 'outflow').eq('pending', false).gte('transaction_date', historyStart).order('transaction_date'),
+    client.from('subscription_suggestion_dismissals').select('merchant_key'),
   ]);
 
   const error = monthResult.error ?? previousMonthResult.error ?? categoriesResult.error ?? categoryBudgetsResult.error ?? previousCategoryBudgetsResult.error ?? subcategoriesResult.error ?? accountsResult.error ?? transactionsResult.error ?? previousTransactionsResult.error
-    ?? billsResult.error ?? billPaymentsResult.error ?? merchantRulesResult.error ?? plannedExpensesResult.error ?? savingsGoalsResult.error ?? savingsGoalContributionsResult.error;
+    ?? billsResult.error ?? billPaymentsResult.error ?? merchantRulesResult.error ?? plannedExpensesResult.error ?? savingsGoalsResult.error ?? savingsGoalContributionsResult.error
+    ?? subscriptionHistoryResult.error ?? subscriptionDismissalsResult.error;
   if (error) throw error;
 
   const categoryRows = (categoriesResult.data ?? []) as CategoryRow[];
@@ -224,6 +300,8 @@ export async function loadCloudBudget(monthStart = currentMonthStart()): Promise
   const plannedExpenseRows = (plannedExpensesResult.data ?? []) as PlannedExpenseRow[];
   const savingsGoalRows = (savingsGoalsResult.data ?? []) as SavingsGoalRow[];
   const savingsGoalContributionRows = (savingsGoalContributionsResult.data ?? []) as SavingsGoalContributionRow[];
+  const subscriptionHistoryRows = (subscriptionHistoryResult.data ?? []) as SubscriptionHistoryRow[];
+  const subscriptionDismissalRows = (subscriptionDismissalsResult.data ?? []) as SubscriptionDismissalRow[];
   const billPayments = new Map(paymentRows.map((payment) => [payment.recurring_bill_id, payment.paid_at]));
   const accountNames = new Map(accountRows.map((account) => [account.id, account.display_name]));
   const spending = new Map<string, number>();
@@ -320,8 +398,19 @@ export async function loadCloudBudget(monthStart = currentMonthStart()): Promise
     previousMonthToDateSpent,
     recurringBills,
     savingsGoals: savingsGoalRows.map((goal) => mapSavingsGoal(goal, contributionsByGoal.get(goal.id) ?? [])),
+    subscriptionSuggestions: detectSubscriptionSuggestions(
+      subscriptionHistoryRows,
+      recurringBills,
+      new Set(subscriptionDismissalRows.map((dismissal) => dismissal.merchant_key)),
+    ),
     transactions,
   };
+}
+
+export async function dismissSubscriptionSuggestion(merchantKey: string) {
+  const client = requireClient();
+  const { error } = await client.from('subscription_suggestion_dismissals').insert({ merchant_key: merchantKey });
+  if (error && error.code !== '23505') throw error;
 }
 
 export async function loadMerchantRules() {
@@ -810,7 +899,7 @@ export async function copyPreviousMonthPlan(input: { month: string; userId: stri
 
 export async function exportCloudBudget() {
   const client = requireClient();
-  const [profileResult, monthsResult, categoriesResult, categoryMonthBudgetsResult, subcategoriesResult, accountsResult, transactionsResult, recurringBillsResult, recurringBillPaymentsResult, merchantRulesResult, plannedExpensesResult, savingsGoalsResult, savingsGoalContributionsResult] = await Promise.all([
+  const [profileResult, monthsResult, categoriesResult, categoryMonthBudgetsResult, subcategoriesResult, accountsResult, transactionsResult, recurringBillsResult, recurringBillPaymentsResult, merchantRulesResult, plannedExpensesResult, savingsGoalsResult, savingsGoalContributionsResult, subscriptionDismissalsResult] = await Promise.all([
     client.from('profiles').select('full_name, created_at, updated_at').single(),
     client.from('budget_months').select('month, expected_income, fixed_costs, created_at, updated_at').order('month'),
     client.from('categories').select('name, color, icon, monthly_limit, spending_group, sort_order, archived_at, created_at, updated_at').order('sort_order'),
@@ -824,11 +913,12 @@ export async function exportCloudBudget() {
     client.from('planned_expenses').select('name, amount, target_month, category_id, covered_at, created_at, updated_at').order('target_month'),
     client.from('savings_goals').select('name, target_amount, current_amount, target_month, created_at, updated_at').order('target_month'),
     client.from('savings_goal_contributions').select('savings_goal_id, amount, note, contributed_on, created_at').order('contributed_on', { ascending: false }),
+    client.from('subscription_suggestion_dismissals').select('merchant_key, created_at').order('created_at'),
   ]);
 
   const error = profileResult.error ?? monthsResult.error ?? categoriesResult.error ?? categoryMonthBudgetsResult.error ?? subcategoriesResult.error ?? accountsResult.error
     ?? transactionsResult.error ?? recurringBillsResult.error ?? recurringBillPaymentsResult.error ?? merchantRulesResult.error
-    ?? plannedExpensesResult.error ?? savingsGoalsResult.error ?? savingsGoalContributionsResult.error;
+    ?? plannedExpensesResult.error ?? savingsGoalsResult.error ?? savingsGoalContributionsResult.error ?? subscriptionDismissalsResult.error;
   if (error) throw error;
 
   return JSON.stringify({
@@ -843,6 +933,7 @@ export async function exportCloudBudget() {
     planned_expenses: plannedExpensesResult.data,
     savings_goals: savingsGoalsResult.data,
     savings_goal_contributions: savingsGoalContributionsResult.data,
+    subscription_suggestion_dismissals: subscriptionDismissalsResult.data,
     transactions: transactionsResult.data,
     recurring_bills: recurringBillsResult.data,
     recurring_bill_payments: recurringBillPaymentsResult.data,
