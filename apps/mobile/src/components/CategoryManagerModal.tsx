@@ -11,7 +11,9 @@ const iconOptions = ['home-outline', 'food-fork-drink', 'car-outline', 'shopping
 const spendingGroups: { detail: string; icon: keyof typeof MaterialCommunityIcons.glyphMap; id: SpendingGroup; label: string }[] = [
   { id: 'needs', label: 'Needs', detail: 'Essentials and required bills', icon: 'home-heart' },
   { id: 'wants', label: 'Wants', detail: 'Optional and lifestyle spending', icon: 'star-outline' },
-  { id: 'savings', label: 'Savings', detail: 'Goals, investing, and reserves', icon: 'piggy-bank-outline' },
+  { id: 'giving', label: 'Giving', detail: 'Gifts, donations, and support', icon: 'hand-heart-outline' },
+  { id: 'savings', label: 'Saving & investing', detail: 'Goals, investing, and reserves', icon: 'piggy-bank-outline' },
+  { id: 'personal', label: 'Personal', detail: 'Your own flexible spending', icon: 'account-heart-outline' },
 ];
 
 type Props = {
@@ -214,8 +216,8 @@ export function CategoryManagerModal({ archivedCategories, categories, visible, 
               <View style={styles.optionRow}>{iconOptions.map((option) => <Pressable key={option} onPress={() => setIcon(option)} style={[styles.iconOption, icon === option && { backgroundColor: color, borderColor: color }]}><MaterialCommunityIcons color={icon === option ? colors.white : colors.inkMuted} name={option} size={22} /></Pressable>)}</View>
             </View>
             <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Money group</Text>
-              <Text style={styles.fieldDetail}>Used only for your Needs, Wants, and Savings percentages.</Text>
+              <Text style={styles.label}>Purpose</Text>
+              <Text style={styles.fieldDetail}>An optional label used only in your Spending by purpose report.</Text>
               <View style={styles.groupOptions}>{spendingGroups.map((group) => <Pressable accessibilityLabel={`Classify as ${group.label}`} key={group.id} onPress={() => setSpendingGroup(group.id)} style={[styles.groupOption, spendingGroup === group.id && styles.groupOptionSelected]}>
                 <View style={[styles.groupIcon, spendingGroup === group.id && styles.groupIconSelected]}>
                   <MaterialCommunityIcons color={spendingGroup === group.id ? colors.white : colors.primaryDark} name={group.icon} size={19} />

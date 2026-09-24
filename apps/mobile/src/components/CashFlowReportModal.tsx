@@ -2,7 +2,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, spacing } from '../theme';
-import type { Category, PlannedExpense, SavingsGoal, Transaction } from '../types';
+import type { Category, PlannedExpense, SavingsGoal, SpendingGroup, Transaction } from '../types';
 import { currentMonthStart, formatMonth, parseDateOnly, plannedExpenseMonthlyAmount, savingsGoalMonthlyAmount, shiftMonth } from '../utils/date';
 import { formatMoney } from '../utils/money';
 
@@ -103,15 +103,17 @@ export function CashFlowReportModal({
     : spendingTrend === 'same'
       ? `The same as ${previousMonth} by this date.`
       : `${spendingChangePercent}% ${spendingTrend === 'down' ? 'less' : 'more'} than ${previousMonth} by this date.`;
-  const groupedSpending = categories.reduce((totals, category) => ({
+  const groupedSpending = categories.reduce<Record<SpendingGroup, number>>((totals, category) => ({
     ...totals,
     [category.spendingGroup]: totals[category.spendingGroup] + category.spent,
-  }), { needs: 0, wants: 0, savings: 0 });
-  const categorizedSpendingTotal = groupedSpending.needs + groupedSpending.wants + groupedSpending.savings;
-  const spendingGroups = [
-    { id: 'needs' as const, label: 'Needs', color: '#5C7CFA', detail: 'Essentials' },
-    { id: 'wants' as const, label: 'Wants', color: colors.accent, detail: 'Lifestyle' },
-    { id: 'savings' as const, label: 'Savings', color: '#5A9E91', detail: 'Goals and reserves' },
+  }), { needs: 0, wants: 0, giving: 0, savings: 0, personal: 0 });
+  const categorizedSpendingTotal = Object.values(groupedSpending).reduce((sum, amount) => sum + amount, 0);
+  const spendingGroups: { color: string; detail: string; id: SpendingGroup; label: string }[] = [
+    { id: 'needs', label: 'Needs', color: '#5C7CFA', detail: 'Essentials' },
+    { id: 'wants', label: 'Wants', color: colors.accent, detail: 'Lifestyle' },
+    { id: 'giving', label: 'Giving', color: '#C47A50', detail: 'Gifts and support' },
+    { id: 'savings', label: 'Saving & investing', color: '#5A9E91', detail: 'Goals and reserves' },
+    { id: 'personal', label: 'Personal', color: '#9A6AB3', detail: 'Your flexible spending' },
   ];
 
   return (
@@ -221,7 +223,7 @@ export function CashFlowReportModal({
         <View style={styles.groupCard}>
           <View style={styles.sectionHeading}>
             <View>
-              <Text style={styles.sectionTitle}>Needs, Wants & Savings</Text>
+              <Text style={styles.sectionTitle}>Spending by purpose</Text>
               <Text style={styles.sectionDetail}>Share of categorized spending</Text>
             </View>
             <MaterialCommunityIcons color={colors.inkMuted} name="chart-donut" size={23} />

@@ -58,9 +58,9 @@ The app will cover the thread's requests through progressive disclosure: the def
 
 - Category organization is now complete: users can create, rename, recolor, reorder, archive, and restore categories without deleting transaction history.
 - Optional subcategories are now available for people who want granularity; broad categories remain the default.
-- Add reusable merchant rules so corrected transactions stay categorized the user's way.
+- Reusable merchant rules now keep corrected transactions categorized the user's way.
 - Planned one-time expenses are now available alongside recurring bills, with a target month, optional category, suggested monthly set-aside, and covered state.
-- Add optional Needs, Wants, Giving, Saving/Investing, and Personal tags across any category.
+- Optional Needs, Wants, Giving, Saving/Investing, and Personal purpose tags are now available across every category.
 
 ### Then — one useful financial picture
 
@@ -134,3 +134,4 @@ Record decisions here with the date, decision, and reason. Move longer technical
 - 2026-09-24: Destructive confirmations use a shared cross-platform dialog path. This keeps planned-expense, recurring-bill, savings-goal, contribution, manual-transaction, category-archive, and merchant-rule removal working in both the installed web app and future native builds.
 - 2026-09-24: A restored Supabase session never renders budget data until Zenify is unlocked. The app locks on launch and whenever it leaves the foreground; native builds use strong device biometrics, while the web PWA requires fresh passkey or password verification before revealing budget data.
 - 2026-09-24: The Safari/Home Screen app offers experimental Supabase WebAuthn passkeys as the free Face ID path. Users enroll from Account settings, can authenticate from both the login and lock screens, and retain password recovery. Credentials are bound to the stable `kcurry-budget.expo.app` relying-party ID.
+- 2026-09-24: Category purpose expands to Needs, Wants, Giving, Saving/Investing, and Personal. The labels remain optional reporting metadata, so they improve the cash-flow breakdown without changing budgets, navigation, or transaction entry.

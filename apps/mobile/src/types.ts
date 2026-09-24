@@ -1,4 +1,4 @@
-export type SpendingGroup = 'needs' | 'wants' | 'savings';
+export type SpendingGroup = 'needs' | 'wants' | 'giving' | 'savings' | 'personal';
 
 export type Category = {
   id: string;
