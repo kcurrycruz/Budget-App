@@ -46,9 +46,15 @@ The committed `public/_redirects` file configures the rewrite automatically on h
 1. Open [https://kcurry-budget.expo.app](https://kcurry-budget.expo.app) in Safari.
 2. Tap the Share button.
 3. Choose **Add to Home Screen**.
-4. Confirm the name **Budget**, then tap **Add**.
+4. Confirm the name **Zenify**, then tap **Add**.
 
 The app opens in a standalone window and continues to use the same private Supabase account and data as other devices.
+
+## App lock and Face ID
+
+Zenify never reveals budget data immediately from a restored session. The installable web app returns to a secure lock screen and requires a password sign-in after launch or backgrounding.
+
+Native iOS and Android builds can use the device biometric prompt for faster unlocking. The iOS build includes a Zenify-specific Face ID permission message. Apple Face ID cannot be tested inside Expo Go and is not available to a browser PWA, so it requires a custom native development or production build.
 
 ## Plaid direction
 

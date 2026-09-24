@@ -34,7 +34,13 @@
     },
     "owner": "kcurrycruz",
     "plugins": [
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Zenify to use Face ID to unlock your private budget."
+        }
+      ]
     ]
   }
 }

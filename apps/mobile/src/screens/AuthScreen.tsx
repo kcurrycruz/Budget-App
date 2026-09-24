@@ -18,7 +18,11 @@ import { colors, radius, shadow, spacing } from '../theme';
 
 type AuthMode = 'reset' | 'signIn' | 'signUp';
 
-export function AuthScreen() {
+type AuthScreenProps = {
+  onAuthenticated?: () => void;
+};
+
+export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [mode, setMode] = useState<AuthMode>('signIn');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -79,6 +83,8 @@ export function AuthScreen() {
 
     if (isSignUp && !result.data.session) {
       setMessage('Check your email to confirm your account, then come back and sign in.');
+    } else if (result.data.session) {
+      onAuthenticated?.();
     }
   };
 

@@ -1,8 +1,9 @@
 import { StatusBar } from 'expo-status-bar';
+import * as LocalAuthentication from 'expo-local-authentication';
 import type { Session } from '@supabase/supabase-js';
 import type { PropsWithChildren } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Easing, Platform, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, AppState, Easing, Platform, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
 import { AddTransactionModal } from './src/components/AddTransactionModal';
 import { BottomNav } from './src/components/BottomNav';
@@ -50,6 +51,7 @@ import {
 import { accounts, initialCategories, initialPlannedExpenses, initialRecurringBills, initialSavingsGoals, initialTransactions, monthlyBills, monthlyIncome, previousMonthToDateSpent as demoPreviousMonthToDateSpent } from './src/data/demo';
 import { isCloudConfigured, supabase } from './src/lib/supabase';
 import { AccountScreen } from './src/screens/AccountScreen';
+import { AppLockScreen } from './src/screens/AppLockScreen';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { ConnectScreen } from './src/screens/ConnectScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
@@ -111,6 +113,41 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(isCloudConfigured);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [appUnlocked, setAppUnlocked] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricLabel, setBiometricLabel] = useState('biometrics');
+  const [unlockBusy, setUnlockBusy] = useState(false);
+  const [unlockError, setUnlockError] = useState<string | null>(null);
+  const autoUnlockAttempted = useRef(false);
+  const unlockInProgress = useRef(false);
+
+  const unlockWithBiometrics = useCallback(async () => {
+    if (Platform.OS === 'web' || unlockInProgress.current) return;
+    unlockInProgress.current = true;
+    setUnlockBusy(true);
+    setUnlockError(null);
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        biometricsSecurityLevel: 'strong',
+        cancelLabel: 'Cancel',
+        fallbackLabel: 'Use Device Passcode',
+        promptMessage: 'Unlock Zenify',
+      });
+      if (result.success) {
+        setAppUnlocked(true);
+      } else if (['not_available', 'not_enrolled', 'passcode_not_set'].includes(result.error)) {
+        setBiometricAvailable(false);
+        setUnlockError('Biometric unlock is not set up on this device. Sign in with your password instead.');
+      } else if (!['app_cancel', 'system_cancel', 'user_cancel'].includes(result.error)) {
+        setUnlockError('We could not verify your identity. Try again or sign in with your password.');
+      }
+    } catch {
+      setUnlockError('Biometric unlock is unavailable right now. Sign in with your password instead.');
+    } finally {
+      unlockInProgress.current = false;
+      setUnlockBusy(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!supabase) return;
@@ -122,6 +159,10 @@ export default function App() {
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
+      if (!nextSession) {
+        setAppUnlocked(false);
+        autoUnlockAttempted.current = false;
+      }
       setSession(nextSession);
       setAuthLoading(false);
     });
@@ -129,10 +170,76 @@ export default function App() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'background') {
+        setAppUnlocked(false);
+        setUnlockError(null);
+        autoUnlockAttempted.current = false;
+      }
+    });
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    if (!session || appUnlocked || Platform.OS === 'web') return;
+    let cancelled = false;
+
+    const prepareBiometrics = async () => {
+      try {
+        const [hasHardware, enrolled, types] = await Promise.all([
+          LocalAuthentication.hasHardwareAsync(),
+          LocalAuthentication.isEnrolledAsync(),
+          LocalAuthentication.supportedAuthenticationTypesAsync(),
+        ]);
+        if (cancelled) return;
+        const available = hasHardware && enrolled;
+        const supportsFace = types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION);
+        const supportsFingerprint = types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT);
+        setBiometricAvailable(available);
+        setBiometricLabel(supportsFace ? 'Face ID' : supportsFingerprint ? 'Touch ID' : 'biometrics');
+        if (available && !autoUnlockAttempted.current) {
+          autoUnlockAttempted.current = true;
+          await unlockWithBiometrics();
+        }
+      } catch {
+        if (!cancelled) setBiometricAvailable(false);
+      }
+    };
+
+    void prepareBiometrics();
+    return () => {
+      cancelled = true;
+    };
+  }, [appUnlocked, session, unlockWithBiometrics]);
+
+  const usePasswordSignIn = async () => {
+    if (!supabase) return;
+    setUnlockBusy(true);
+    setUnlockError(null);
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
+    setUnlockBusy(false);
+    if (error) {
+      setUnlockError(error.message);
+    }
+  };
+
   if (authLoading) return <LoadingScreen />;
-  if (isCloudConfigured && !session) return <AuthScreen />;
+  if (isCloudConfigured && !session) return <AuthScreen onAuthenticated={() => setAppUnlocked(true)} />;
   if (isCloudConfigured && session && passwordRecovery) {
     return <UpdatePasswordScreen onComplete={() => setPasswordRecovery(false)} />;
+  }
+  if (isCloudConfigured && session && !appUnlocked) {
+    return (
+      <AppLockScreen
+        biometricAvailable={biometricAvailable}
+        biometricLabel={biometricLabel}
+        busy={unlockBusy}
+        error={unlockError}
+        onPasswordSignIn={() => { void usePasswordSignIn(); }}
+        onUnlock={() => { void unlockWithBiometrics(); }}
+      />
+    );
   }
 
   return <BudgetApp session={session} />;
