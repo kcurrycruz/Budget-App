@@ -147,6 +147,15 @@ export type SubscriptionSuggestion = {
   occurrenceCount: number;
 };
 
+export type IncomeSuggestion = {
+  cadence: 'weekly' | 'biweekly' | 'monthly' | 'multiple';
+  monthlyAmount: number;
+  occurrenceCount: number;
+  payerName: string;
+  sourceCount: number;
+  sourceKeys: string[];
+};
+
 export type Account = {
   id: string;
   name: string;

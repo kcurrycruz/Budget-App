@@ -1,9 +1,10 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
 
 import { supabase } from '../lib/supabase';
-import type { Account, Category, CategoryDraft, ImportedTransactionDraft, ManualTransactionDraft, MerchantRule, NetWorthSnapshot, PlannedExpense, PlannedExpenseContribution, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalContribution, SavingsGoalContributionDraft, SavingsGoalDraft, SpendingGroup, SubscriptionSuggestion, Transaction } from '../types';
+import type { Account, Category, CategoryDraft, ImportedTransactionDraft, IncomeSuggestion, ManualTransactionDraft, MerchantRule, NetWorthSnapshot, PlannedExpense, PlannedExpenseContribution, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalContribution, SavingsGoalContributionDraft, SavingsGoalDraft, SpendingGroup, SubscriptionSuggestion, Transaction } from '../types';
 import { currentMonthStart, formatActivityDate, parseDateOnly, plannedExpenseMonthlyAmount, shiftMonth, toDateOnly } from '../utils/date';
 import { summarizeNetWorth } from '../utils/netWorth';
+import { detectRecurringIncome, type IncomeHistoryRow } from '../utils/recurringIncome';
 
 export type CloudBudgetData = {
   accounts: Account[];
@@ -11,6 +12,7 @@ export type CloudBudgetData = {
   bills: number;
   categories: Category[];
   income: number;
+  incomeSuggestion?: IncomeSuggestion;
   merchantRules: MerchantRule[];
   netWorthHistory: NetWorthSnapshot[];
   plannedExpenses: PlannedExpense[];
@@ -76,6 +78,10 @@ type SubscriptionHistoryRow = Pick<TransactionRow, 'amount' | 'category_id' | 'm
 
 type SubscriptionDismissalRow = {
   merchant_key: string;
+};
+
+type IncomeSuggestionResolutionRow = {
+  suggestion_key: string;
 };
 
 type SubcategoryRow = {
@@ -293,8 +299,11 @@ export async function loadCloudBudget(monthStart = currentMonthStart()): Promise
   const historyStartDate = new Date();
   historyStartDate.setDate(historyStartDate.getDate() - 180);
   const historyStart = toDateOnly(historyStartDate);
+  const incomeHistoryStartDate = new Date();
+  incomeHistoryStartDate.setDate(incomeHistoryStartDate.getDate() - 365);
+  const incomeHistoryStart = toDateOnly(incomeHistoryStartDate);
 
-  const [monthResult, previousMonthResult, categoriesResult, categoryBudgetsResult, previousCategoryBudgetsResult, subcategoriesResult, accountsResult, transactionsResult, previousTransactionsResult, billsResult, billPaymentsResult, merchantRulesResult, plannedExpensesResult, plannedExpenseContributionsResult, savingsGoalsResult, savingsGoalContributionsResult, subscriptionHistoryResult, subscriptionDismissalsResult] = await Promise.all([
+  const [monthResult, previousMonthResult, categoriesResult, categoryBudgetsResult, previousCategoryBudgetsResult, subcategoriesResult, accountsResult, transactionsResult, previousTransactionsResult, billsResult, billPaymentsResult, merchantRulesResult, plannedExpensesResult, plannedExpenseContributionsResult, savingsGoalsResult, savingsGoalContributionsResult, subscriptionHistoryResult, subscriptionDismissalsResult, incomeHistoryResult, incomeResolutionsResult] = await Promise.all([
     client.from('budget_months').select('expected_income, fixed_costs').eq('month', start).maybeSingle(),
     client.from('budget_months').select('expected_income, fixed_costs').eq('month', previousStart).maybeSingle(),
     client.from('categories').select('id, name, color, icon, monthly_limit, spending_group, sort_order, archived_at').order('sort_order').order('name'),
@@ -313,11 +322,13 @@ export async function loadCloudBudget(monthStart = currentMonthStart()): Promise
     client.from('savings_goal_contributions').select('id, savings_goal_id, amount, note, contributed_on, created_at').lt('contributed_on', end).order('contributed_on', { ascending: false }).order('created_at', { ascending: false }),
     client.from('transactions').select('merchant_name, category_id, amount, transaction_date').eq('direction', 'outflow').eq('pending', false).gte('transaction_date', historyStart).order('transaction_date'),
     client.from('subscription_suggestion_dismissals').select('merchant_key'),
+    client.from('transactions').select('merchant_name, amount, transaction_date, plaid_category_detailed').eq('direction', 'inflow').eq('pending', false).eq('source', 'plaid').eq('plaid_category_primary', 'INCOME').gte('transaction_date', incomeHistoryStart).order('transaction_date'),
+    client.from('income_suggestion_resolutions').select('suggestion_key'),
   ]);
 
   const error = monthResult.error ?? previousMonthResult.error ?? categoriesResult.error ?? categoryBudgetsResult.error ?? previousCategoryBudgetsResult.error ?? subcategoriesResult.error ?? accountsResult.error ?? transactionsResult.error ?? previousTransactionsResult.error
     ?? billsResult.error ?? billPaymentsResult.error ?? merchantRulesResult.error ?? plannedExpensesResult.error ?? plannedExpenseContributionsResult.error ?? savingsGoalsResult.error ?? savingsGoalContributionsResult.error
-    ?? subscriptionHistoryResult.error ?? subscriptionDismissalsResult.error;
+    ?? subscriptionHistoryResult.error ?? subscriptionDismissalsResult.error ?? incomeHistoryResult.error ?? incomeResolutionsResult.error;
   if (error) throw error;
 
   const categoryRows = (categoriesResult.data ?? []) as CategoryRow[];
@@ -335,6 +346,8 @@ export async function loadCloudBudget(monthStart = currentMonthStart()): Promise
   const savingsGoalContributionRows = (savingsGoalContributionsResult.data ?? []) as SavingsGoalContributionRow[];
   const subscriptionHistoryRows = (subscriptionHistoryResult.data ?? []) as SubscriptionHistoryRow[];
   const subscriptionDismissalRows = (subscriptionDismissalsResult.data ?? []) as SubscriptionDismissalRow[];
+  const incomeHistoryRows = (incomeHistoryResult.data ?? []) as IncomeHistoryRow[];
+  const incomeResolutionRows = (incomeResolutionsResult.data ?? []) as IncomeSuggestionResolutionRow[];
   const billPayments = new Map(paymentRows.map((payment) => [payment.recurring_bill_id, payment.paid_at]));
   const accountNames = new Map(accountRows.map((account) => [account.id, account.display_name]));
   const spending = new Map<string, number>();
@@ -501,6 +514,10 @@ export async function loadCloudBudget(monthStart = currentMonthStart()): Promise
     bills: Number(monthResult.data?.fixed_costs ?? 0),
     categories,
     income: Number(monthResult.data?.expected_income ?? 0),
+    incomeSuggestion: detectRecurringIncome(
+      incomeHistoryRows,
+      new Set(incomeResolutionRows.map((resolution) => resolution.suggestion_key)),
+    ),
     merchantRules: merchantRuleRows.map(mapMerchantRule),
     netWorthHistory,
     plannedExpenses: plannedExpenseRows.map((expense) => mapPlannedExpense(
@@ -524,6 +541,23 @@ export async function dismissSubscriptionSuggestion(merchantKey: string) {
   const client = requireClient();
   const { error } = await client.from('subscription_suggestion_dismissals').insert({ merchant_key: merchantKey });
   if (error && error.code !== '23505') throw error;
+}
+
+export async function resolveIncomeSuggestion(
+  sourceKeys: string[],
+  resolution: 'accepted' | 'dismissed',
+) {
+  if (sourceKeys.length === 0) return;
+  const client = requireClient();
+  const { error } = await client.from('income_suggestion_resolutions').upsert(
+    sourceKeys.map((suggestionKey) => ({
+      suggestion_key: suggestionKey,
+      resolution,
+      updated_at: new Date().toISOString(),
+    })),
+    { onConflict: 'user_id,suggestion_key' },
+  );
+  if (error) throw error;
 }
 
 export async function loadMerchantRules() {
@@ -1056,7 +1090,7 @@ export async function copyPreviousMonthPlan(input: { month: string; userId: stri
 
 export async function exportCloudBudget() {
   const client = requireClient();
-  const [profileResult, monthsResult, categoriesResult, categoryMonthBudgetsResult, subcategoriesResult, accountsResult, netWorthSnapshotsResult, transactionsResult, recurringBillsResult, recurringBillPaymentsResult, merchantRulesResult, plannedExpensesResult, plannedExpenseContributionsResult, savingsGoalsResult, savingsGoalContributionsResult, subscriptionDismissalsResult] = await Promise.all([
+  const [profileResult, monthsResult, categoriesResult, categoryMonthBudgetsResult, subcategoriesResult, accountsResult, netWorthSnapshotsResult, transactionsResult, recurringBillsResult, recurringBillPaymentsResult, merchantRulesResult, plannedExpensesResult, plannedExpenseContributionsResult, savingsGoalsResult, savingsGoalContributionsResult, subscriptionDismissalsResult, incomeSuggestionResolutionsResult] = await Promise.all([
     client.from('profiles').select('full_name, created_at, updated_at').single(),
     client.from('budget_months').select('month, expected_income, fixed_costs, created_at, updated_at').order('month'),
     client.from('categories').select('name, color, icon, monthly_limit, spending_group, sort_order, archived_at, created_at, updated_at').order('sort_order'),
@@ -1073,11 +1107,13 @@ export async function exportCloudBudget() {
     client.from('savings_goals').select('name, target_amount, current_amount, target_month, created_at, updated_at').order('target_month'),
     client.from('savings_goal_contributions').select('savings_goal_id, amount, note, contributed_on, created_at').order('contributed_on', { ascending: false }),
     client.from('subscription_suggestion_dismissals').select('merchant_key, created_at').order('created_at'),
+    client.from('income_suggestion_resolutions').select('suggestion_key, resolution, created_at, updated_at').order('created_at'),
   ]);
 
   const error = profileResult.error ?? monthsResult.error ?? categoriesResult.error ?? categoryMonthBudgetsResult.error ?? subcategoriesResult.error ?? accountsResult.error ?? netWorthSnapshotsResult.error
     ?? transactionsResult.error ?? recurringBillsResult.error ?? recurringBillPaymentsResult.error ?? merchantRulesResult.error
-    ?? plannedExpensesResult.error ?? plannedExpenseContributionsResult.error ?? savingsGoalsResult.error ?? savingsGoalContributionsResult.error ?? subscriptionDismissalsResult.error;
+    ?? plannedExpensesResult.error ?? plannedExpenseContributionsResult.error ?? savingsGoalsResult.error ?? savingsGoalContributionsResult.error ?? subscriptionDismissalsResult.error
+    ?? incomeSuggestionResolutionsResult.error;
   if (error) throw error;
 
   return JSON.stringify({
@@ -1095,6 +1131,7 @@ export async function exportCloudBudget() {
     savings_goals: savingsGoalsResult.data,
     savings_goal_contributions: savingsGoalContributionsResult.data,
     subscription_suggestion_dismissals: subscriptionDismissalsResult.data,
+    income_suggestion_resolutions: incomeSuggestionResolutionsResult.data,
     transactions: transactionsResult.data,
     recurring_bills: recurringBillsResult.data,
     recurring_bill_payments: recurringBillPaymentsResult.data,

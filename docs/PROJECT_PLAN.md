@@ -34,7 +34,7 @@ Product name: **Zenify**. Brand promise: **Unifying all finances in one place to
 
 The current private beta is a foundation, not a locked final design. Continue adding features and refining the phone UI as real usage reveals what makes budgeting faster and clearer.
 
-- Recurring bills, subscriptions, and expected-income reminders.
+- Continue refining recurring-bill, subscription, and expected-income detection as private-beta patterns appear. Review-first suggestions are now available for stable charges and Plaid income.
 - Spreadsheet history import and easier bulk editing.
 - Continue refining Plaid category mappings as real private-beta transaction patterns appear. High-confidence automatic categories and reusable merchant rules are now available.
 - More useful cash-flow trends, monthly comparisons, and goal tracking.
@@ -60,6 +60,7 @@ The app will cover the thread's requests through progressive disclosure: the def
 - Optional subcategories are now available for people who want granularity; broad categories remain the default.
 - Reusable merchant rules now keep corrected transactions categorized the user's way.
 - Plaid imports now accept high-confidence matches for common categories and subcategories, keep uncertain matches in Review, and replace matched pending charges with their posted versions.
+- Stable Plaid income patterns now produce an optional monthly take-home estimate. Users can apply or dismiss it; Zenify never overwrites the plan automatically.
 - Planned one-time expenses are now available alongside recurring bills, with a target month, optional category, suggested monthly set-aside, and covered state.
 - Optional Needs, Wants, Giving, Saving/Investing, and Personal purpose tags are now available across every category.
 
@@ -140,3 +141,4 @@ Record decisions here with the date, decision, and reason. Move longer technical
 - 2026-09-24: Net-worth history stores one private connected-balance snapshot per month and shows at most six recent checkpoints inside Accounts. Empty accounts never overwrite prior history, and the primary Home screen remains focused on the current month.
 - 2026-09-24: Planned expenses offer opt-in monthly sinking-fund automation. Zenify records one private bookkeeping contribution per expense per month, recalculates the remaining pace, and never claims to transfer money between financial accounts.
 - 2026-09-24: Plaid category confidence controls automation. Merchant rules and user-reviewed choices remain authoritative; only high-confidence semantic matches bypass Review, and a posted transaction replaces its linked pending record without losing a prior correction.
+- 2026-09-24: Expected-income automation remains review-first. Zenify requires at least three recent Plaid income deposits with a stable weekly, roughly biweekly, or monthly cadence, estimates a monthly average, and changes the plan only after the user chooses “Use estimate.”

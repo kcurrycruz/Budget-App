@@ -37,6 +37,7 @@ import {
   loadCloudBudget,
   loadMerchantRules,
   reorderCategories,
+  resolveIncomeSuggestion,
   restoreCategory as restoreBudgetCategory,
   saveMonthlyPlan,
   setPlannedExpenseCovered,
@@ -61,7 +62,7 @@ import { PlanSetupScreen } from './src/screens/PlanSetupScreen';
 import { TransactionsScreen } from './src/screens/TransactionsScreen';
 import { UpdatePasswordScreen } from './src/screens/UpdatePasswordScreen';
 import { colors } from './src/theme';
-import type { AppTab, Category, CategoryDraft, ImportedTransactionDraft, ManualTransactionDraft, MerchantRule, NetWorthSnapshot, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalContribution, SavingsGoalContributionDraft, SavingsGoalDraft, Subcategory, SubscriptionSuggestion, Transaction } from './src/types';
+import type { AppTab, Category, CategoryDraft, ImportedTransactionDraft, IncomeSuggestion, ManualTransactionDraft, MerchantRule, NetWorthSnapshot, PlannedExpense, PlannedExpenseDraft, RecurringBill, RecurringBillDraft, SavingsGoal, SavingsGoalContribution, SavingsGoalContributionDraft, SavingsGoalDraft, Subcategory, SubscriptionSuggestion, Transaction } from './src/types';
 import { currentMonthStart, formatActivityDate, toDateOnly } from './src/utils/date';
 import { confirmAction, showMessage } from './src/utils/dialogs';
 import { formatMoney } from './src/utils/money';
@@ -284,6 +285,8 @@ function BudgetApp({ session }: BudgetAppProps) {
   const [archivedCategories, setArchivedCategories] = useState<Category[]>([]);
   const [connectedAccounts, setConnectedAccounts] = useState(cloudMode ? [] : accounts);
   const [income, setIncome] = useState(cloudMode ? 0 : monthlyIncome);
+  const [incomeSuggestion, setIncomeSuggestion] = useState<IncomeSuggestion | undefined>();
+  const [incomeSuggestionAction, setIncomeSuggestionAction] = useState<'accepted' | 'dismissed' | null>(null);
   const [bills, setBills] = useState(cloudMode ? 0 : monthlyBills);
   const [previousMonthToDateSpent, setPreviousMonthToDateSpent] = useState(cloudMode ? 0 : demoPreviousMonthToDateSpent);
   const [previousPlanAvailable, setPreviousPlanAvailable] = useState(false);
@@ -337,6 +340,7 @@ function BudgetApp({ session }: BudgetAppProps) {
       setArchivedCategories(data.archivedCategories);
       setConnectedAccounts(data.accounts);
       setIncome(data.income);
+      setIncomeSuggestion(data.incomeSuggestion);
       setBills(data.bills);
       setPreviousMonthToDateSpent(data.previousMonthToDateSpent);
       setMerchantRules(data.merchantRules);
@@ -482,6 +486,54 @@ function BudgetApp({ session }: BudgetAppProps) {
     setIncome(input.income);
     setCategories((current) => current.map((category) => ({ ...category, budget: input.categoryBudgets[category.id] ?? 0 })));
     setPlanEditing(false);
+    if (incomeSuggestion && Math.abs(input.income - incomeSuggestion.monthlyAmount) < 0.01) {
+      setIncomeSuggestion(undefined);
+      try {
+        await resolveIncomeSuggestion(incomeSuggestion.sourceKeys, 'accepted');
+      } catch {
+        // The plan is already saved; a later refresh can safely offer the estimate again.
+      }
+    }
+  };
+
+  const useIncomeSuggestion = async (suggestion: IncomeSuggestion) => {
+    if (!session || incomeSuggestionAction) return;
+    setIncomeSuggestionAction('accepted');
+    try {
+      await saveMonthlyPlan({
+        bills,
+        categories: categories.map((category) => ({ id: category.id, budget: category.budget })),
+        income: suggestion.monthlyAmount,
+        month: selectedMonth,
+        userId: session.user.id,
+      });
+      setIncome(suggestion.monthlyAmount);
+      setIncomeSuggestion(undefined);
+    } catch (caught) {
+      showMessage('Could not use income estimate', caught instanceof Error ? caught.message : 'Please try again.');
+      setIncomeSuggestionAction(null);
+      return;
+    }
+    try {
+      await resolveIncomeSuggestion(suggestion.sourceKeys, 'accepted');
+    } catch {
+      showMessage('Income updated', 'Zenify could not remember this Plaid suggestion, so it may appear again later.');
+    } finally {
+      setIncomeSuggestionAction(null);
+    }
+  };
+
+  const dismissIncomeEstimate = async (suggestion: IncomeSuggestion) => {
+    if (!session || incomeSuggestionAction) return;
+    setIncomeSuggestionAction('dismissed');
+    try {
+      await resolveIncomeSuggestion(suggestion.sourceKeys, 'dismissed');
+      setIncomeSuggestion(undefined);
+    } catch (caught) {
+      showMessage('Could not dismiss income estimate', caught instanceof Error ? caught.message : 'Please try again.');
+    } finally {
+      setIncomeSuggestionAction(null);
+    }
   };
 
   const copyPreviousPlan = async () => {
@@ -1011,6 +1063,7 @@ function BudgetApp({ session }: BudgetAppProps) {
       <SafeAreaView style={styles.safeArea}>
         <PlanSetupScreen
           categories={categories}
+          incomeSuggestion={selectedMonth === currentMonthStart() ? incomeSuggestion : undefined}
           initialBills={bills}
           initialIncome={income}
           key={selectedMonth}
@@ -1064,6 +1117,8 @@ function BudgetApp({ session }: BudgetAppProps) {
             categories={categories}
             copyingPreviousPlan={planCopying}
             income={income}
+            incomeSuggestion={selectedMonth === currentMonthStart() ? incomeSuggestion : undefined}
+            incomeSuggestionAction={incomeSuggestionAction}
             month={selectedMonth}
             onAddBill={() => openRecurringBill()}
             onAddPlannedExpense={() => openPlannedExpense()}
@@ -1080,6 +1135,8 @@ function BudgetApp({ session }: BudgetAppProps) {
             onTogglePlannedExpenseCovered={(expense) => { void togglePlannedExpenseCovered(expense); }}
             onAddSubscriptionSuggestion={openSubscriptionSuggestion}
             onDismissSubscriptionSuggestion={(suggestion) => { void dismissSuggestedSubscription(suggestion); }}
+            onDismissIncomeSuggestion={(suggestion) => { void dismissIncomeEstimate(suggestion); }}
+            onUseIncomeSuggestion={(suggestion) => { void useIncomeSuggestion(suggestion); }}
             plannedExpenses={plannedExpenses}
             recurringBills={recurringBills}
             savingsGoals={savingsGoals}

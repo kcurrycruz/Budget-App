@@ -13,11 +13,12 @@ import {
 } from 'react-native';
 
 import { colors, radius, spacing } from '../theme';
-import type { Category } from '../types';
-import { formatMoneyInput, parseMoneyInput } from '../utils/money';
+import type { Category, IncomeSuggestion } from '../types';
+import { formatMoney, formatMoneyInput, parseMoneyInput } from '../utils/money';
 
 type PlanSetupScreenProps = {
   categories: Category[];
+  incomeSuggestion?: IncomeSuggestion;
   initialBills?: number;
   initialIncome?: number;
   onCancel?: () => void;
@@ -26,6 +27,7 @@ type PlanSetupScreenProps = {
 
 export function PlanSetupScreen({
   categories,
+  incomeSuggestion,
   initialBills = 0,
   initialIncome = 0,
   onCancel,
@@ -86,6 +88,20 @@ export function PlanSetupScreen({
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Monthly take-home income</Text>
           <MoneyInput onChangeText={(value) => setIncome(formatMoneyInput(value))} placeholder="7,000" value={income} />
+          {incomeSuggestion ? (
+            <Pressable
+              accessibilityLabel={`Use Plaid income estimate of ${formatMoney(incomeSuggestion.monthlyAmount)}`}
+              onPress={() => setIncome(formatMoneyInput(String(incomeSuggestion.monthlyAmount)))}
+              style={styles.incomeSuggestion}
+            >
+              <MaterialCommunityIcons color={colors.primaryDark} name="bank-check" size={20} />
+              <View style={styles.incomeSuggestionCopy}>
+                <Text style={styles.incomeSuggestionTitle}>Plaid found a recurring income pattern</Text>
+                <Text style={styles.incomeSuggestionDetail}>{incomeSuggestion.payerName} · about {formatMoney(incomeSuggestion.monthlyAmount)}/month</Text>
+              </View>
+              <Text style={styles.incomeSuggestionAction}>Use</Text>
+            </Pressable>
+          ) : null}
         </View>
 
         <View style={styles.section}>
@@ -176,6 +192,11 @@ const styles = StyleSheet.create({
   detail: { color: colors.inkMuted, fontSize: 14, lineHeight: 21 },
   section: { gap: spacing.sm },
   sectionTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' },
+  incomeSuggestion: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.md, flexDirection: 'row', gap: spacing.sm, padding: spacing.md },
+  incomeSuggestionCopy: { flex: 1, gap: 2 },
+  incomeSuggestionTitle: { color: colors.primaryDark, fontSize: 12, fontWeight: '800' },
+  incomeSuggestionDetail: { color: colors.inkMuted, fontSize: 10, lineHeight: 15 },
+  incomeSuggestionAction: { color: colors.primaryDark, fontSize: 12, fontWeight: '800' },
   hint: { color: colors.inkMuted, fontSize: 11, lineHeight: 16 },
   moneyInput: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, flexDirection: 'row', paddingHorizontal: spacing.lg },
   moneyCurrency: { color: colors.ink, fontSize: 22, fontWeight: '800' },

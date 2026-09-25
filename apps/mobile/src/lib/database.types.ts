@@ -789,6 +789,41 @@ export type Database = {
           },
         ]
       }
+      income_suggestion_resolutions: {
+        Row: {
+          created_at: string
+          id: string
+          resolution: string
+          suggestion_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          resolution: string
+          suggestion_key: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          resolution?: string
+          suggestion_key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "income_suggestion_resolutions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscription_suggestion_dismissals: {
         Row: {
           created_at: string

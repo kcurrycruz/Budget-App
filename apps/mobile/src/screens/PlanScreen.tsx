@@ -7,7 +7,7 @@ import { RecurringBillRow } from '../components/RecurringBillRow';
 import { SavingsGoalRow } from '../components/SavingsGoalRow';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { colors, radius, spacing } from '../theme';
-import type { Category, PlannedExpense, RecurringBill, SavingsGoal, SubscriptionSuggestion } from '../types';
+import type { Category, IncomeSuggestion, PlannedExpense, RecurringBill, SavingsGoal, SubscriptionSuggestion } from '../types';
 import { formatMonth, plannedExpenseMonthlySetAside, savingsGoalMonthlyAmount, shiftMonth } from '../utils/date';
 import { formatMoney } from '../utils/money';
 
@@ -16,6 +16,8 @@ type PlanScreenProps = {
   categories: Category[];
   copyingPreviousPlan: boolean;
   income: number;
+  incomeSuggestion?: IncomeSuggestion;
+  incomeSuggestionAction?: 'accepted' | 'dismissed' | null;
   month: string;
   bills: number;
   plannedExpenses: PlannedExpense[];
@@ -36,6 +38,8 @@ type PlanScreenProps = {
   onSelectMonth: () => void;
   onAddSubscriptionSuggestion: (suggestion: SubscriptionSuggestion) => void;
   onDismissSubscriptionSuggestion: (suggestion: SubscriptionSuggestion) => void;
+  onDismissIncomeSuggestion: (suggestion: IncomeSuggestion) => void;
+  onUseIncomeSuggestion: (suggestion: IncomeSuggestion) => void;
   onToggleBillPaid: (bill: RecurringBill) => void;
   onTogglePlannedExpenseCovered: (expense: PlannedExpense) => void;
 };
@@ -45,6 +49,8 @@ export function PlanScreen({
   categories,
   copyingPreviousPlan,
   income,
+  incomeSuggestion,
+  incomeSuggestionAction,
   month,
   bills,
   plannedExpenses,
@@ -65,6 +71,8 @@ export function PlanScreen({
   onSelectMonth,
   onAddSubscriptionSuggestion,
   onDismissSubscriptionSuggestion,
+  onDismissIncomeSuggestion,
+  onUseIncomeSuggestion,
   onToggleBillPaid,
   onTogglePlannedExpenseCovered,
 }: PlanScreenProps) {
@@ -83,6 +91,13 @@ export function PlanScreen({
   const recurringTotal = recurringBills.reduce((sum, bill) => sum + bill.amount, 0);
   const paidCount = recurringBills.filter((bill) => bill.paid).length;
   const previousMonth = formatMonth(shiftMonth(month, -1), false);
+  const incomeCadence = incomeSuggestion?.cadence === 'weekly'
+    ? 'paid weekly'
+    : incomeSuggestion?.cadence === 'biweekly'
+      ? 'paid about every two weeks'
+      : incomeSuggestion?.cadence === 'monthly'
+        ? 'paid monthly'
+        : `${incomeSuggestion?.sourceCount ?? 0} recurring sources`;
 
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -120,6 +135,43 @@ export function PlanScreen({
               ? <ActivityIndicator color={colors.white} size="small" />
               : <Text style={styles.copyButtonText}>Copy</Text>}
           </Pressable>
+        </View>
+      ) : null}
+
+      {incomeSuggestion ? (
+        <View style={styles.incomeSuggestionCard}>
+          <View style={styles.incomeSuggestionIcon}>
+            <MaterialCommunityIcons color={colors.primaryDark} name="bank-check" size={23} />
+          </View>
+          <View style={styles.incomeSuggestionCopy}>
+            <Text style={styles.incomeSuggestionEyebrow}>PLAID INCOME ESTIMATE</Text>
+            <Text style={styles.incomeSuggestionAmount}>{formatMoney(incomeSuggestion.monthlyAmount)}/month</Text>
+            <Text numberOfLines={2} style={styles.incomeSuggestionDetail}>
+              {incomeSuggestion.payerName} · {incomeCadence} · {incomeSuggestion.occurrenceCount} deposits reviewed
+            </Text>
+          </View>
+          <View style={styles.incomeSuggestionActions}>
+            <Pressable
+              accessibilityLabel="Dismiss Plaid income estimate"
+              disabled={Boolean(incomeSuggestionAction)}
+              onPress={() => onDismissIncomeSuggestion(incomeSuggestion)}
+              style={styles.incomeDismissButton}
+            >
+              {incomeSuggestionAction === 'dismissed'
+                ? <ActivityIndicator color={colors.inkMuted} size="small" />
+                : <MaterialCommunityIcons color={colors.inkMuted} name="close" size={19} />}
+            </Pressable>
+            <Pressable
+              accessibilityLabel={`Use ${formatMoney(incomeSuggestion.monthlyAmount)} as expected monthly income`}
+              disabled={Boolean(incomeSuggestionAction)}
+              onPress={() => onUseIncomeSuggestion(incomeSuggestion)}
+              style={styles.incomeUseButton}
+            >
+              {incomeSuggestionAction === 'accepted'
+                ? <ActivityIndicator color={colors.white} size="small" />
+                : <Text style={styles.incomeUseText}>Use estimate</Text>}
+            </Pressable>
+          </View>
         </View>
       ) : null}
 
@@ -391,6 +443,16 @@ const styles = StyleSheet.create({
   planTrack: { backgroundColor: '#FFFFFF1F', borderRadius: radius.pill, height: 10, overflow: 'hidden' },
   planTrackFill: { backgroundColor: colors.accent, borderRadius: radius.pill, height: '100%' },
   planDetail: { color: '#BFD8C9', fontSize: 12 },
+  incomeSuggestionCard: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.md, flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, padding: spacing.lg },
+  incomeSuggestionIcon: { alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.pill, height: 44, justifyContent: 'center', width: 44 },
+  incomeSuggestionCopy: { flex: 1, minWidth: 190 },
+  incomeSuggestionEyebrow: { color: colors.primary, fontSize: 9, fontWeight: '800', letterSpacing: 0.7 },
+  incomeSuggestionAmount: { color: colors.primaryDark, fontSize: 19, fontWeight: '800', marginTop: 2 },
+  incomeSuggestionDetail: { color: colors.inkMuted, fontSize: 10, lineHeight: 15, marginTop: 2 },
+  incomeSuggestionActions: { alignItems: 'center', flexDirection: 'row', gap: spacing.xs, marginLeft: 'auto' },
+  incomeDismissButton: { alignItems: 'center', height: 36, justifyContent: 'center', width: 32 },
+  incomeUseButton: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: radius.pill, minWidth: 92, paddingHorizontal: 12, paddingVertical: 10 },
+  incomeUseText: { color: colors.white, fontSize: 11, fontWeight: '800' },
   reportCard: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, flexDirection: 'row', gap: spacing.md, padding: spacing.lg },
   reportIcon: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.md, height: 48, justifyContent: 'center', width: 48 },
   reportCopy: { flex: 1, gap: 3 },
