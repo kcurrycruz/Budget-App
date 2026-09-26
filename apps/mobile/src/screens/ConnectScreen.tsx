@@ -65,8 +65,8 @@ export function ConnectScreen({ accounts, cloudMode, netWorthHistory, onAccounts
         const institutions = failed.map((item) => accounts.find((account) => account.connectionId === item.itemId)?.institution ?? 'A bank');
         const uniqueInstitutions = [...new Set(institutions)];
         showMessage(
-          'Some accounts need attention',
-          `${result.syncedItems} ${result.syncedItems === 1 ? 'connection' : 'connections'} updated. ${uniqueInstitutions.join(', ')} could not sync. Open the affected bank connection to repair it, or try again later.\n\n${failed[0]?.error ?? ''}`.trim(),
+          result.syncedItems === 0 ? 'No accounts updated' : 'Some accounts need attention',
+          `${result.syncedItems} ${result.syncedItems === 1 ? 'connection' : 'connections'} updated. ${uniqueInstitutions.join(', ')} could not sync. Try syncing again, or open the bank connection if sign-in needs renewing.\n\n${failed[0]?.error ?? ''}`.trim(),
         );
       } else {
         showMessage('Accounts updated', 'Your latest available balances and transactions are now in the budget.');

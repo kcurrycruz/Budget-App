@@ -5,6 +5,7 @@ import type { Account, Category, CategoryDraft, ImportedTransactionDraft, Income
 import { currentMonthStart, formatActivityDate, parseDateOnly, plannedExpenseMonthlyAmount, shiftMonth, toDateOnly } from '../utils/date';
 import { summarizeNetWorth } from '../utils/netWorth';
 import { detectRecurringIncome, type IncomeHistoryRow } from '../utils/recurringIncome';
+import { recoverFailedPlaidSync, type PlaidSyncResult } from '../utils/plaidSyncResult';
 
 export type CloudBudgetData = {
   accounts: Account[];
@@ -1160,13 +1161,15 @@ export async function exchangePlaidPublicToken(publicToken: string, institutionN
 }
 
 export async function syncPlaidAccounts() {
-  const data = await invokeFunction<{
-    results: Array<
-      | { itemId: string; added: number; modified: number; removed: number }
-      | { itemId: string; error: string }
-    >;
-    syncedItems: number;
-  }>('plaid-sync');
+  const client = requireClient();
+  const { data, error } = await client.functions.invoke<PlaidSyncResult>('plaid-sync', { body: {} });
+  if (error instanceof FunctionsHttpError) {
+    const payload = await error.context.json().catch(() => null) as { error?: string } | null;
+    const failedResult = recoverFailedPlaidSync(payload);
+    if (failedResult) return failedResult;
+    throw new Error(payload?.error ?? error.message);
+  }
+  if (error) throw new Error(error.message);
   if (!data || !Array.isArray(data.results) || typeof data.syncedItems !== 'number') {
     throw new Error('Plaid did not return a sync result. Please try again.');
   }

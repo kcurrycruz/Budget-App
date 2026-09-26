@@ -10,6 +10,7 @@ The web beta now contains the complete connection boundary: authenticated Link-t
 - Show connection, sync, and re-authentication states.
 - Show a private, plain-language distinction between a bank sign-in that needs renewal and a sync that can be retried.
 - Show which institution failed when a manual sync succeeds for only some connections.
+- Keep the per-institution explanation when every connection fails; a server error must not collapse the result into a generic toast.
 - Never receive or store a Plaid access token.
 
 ## Server responsibilities
