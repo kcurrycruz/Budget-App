@@ -1160,5 +1160,15 @@ export async function exchangePlaidPublicToken(publicToken: string, institutionN
 }
 
 export async function syncPlaidAccounts() {
-  return invokeFunction<{ syncedItems: number }>('plaid-sync');
+  const data = await invokeFunction<{
+    results: Array<
+      | { itemId: string; added: number; modified: number; removed: number }
+      | { itemId: string; error: string }
+    >;
+    syncedItems: number;
+  }>('plaid-sync');
+  if (!data || !Array.isArray(data.results) || typeof data.syncedItems !== 'number') {
+    throw new Error('Plaid did not return a sync result. Please try again.');
+  }
+  return data;
 }

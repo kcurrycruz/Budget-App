@@ -1,6 +1,6 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PlaidConnectButton } from '../components/PlaidConnectButton';
 import { ManageConnectionModal } from '../components/ManageConnectionModal';
@@ -8,6 +8,7 @@ import { ScreenHeader } from '../components/ScreenHeader';
 import { disconnectPlaidItem, syncPlaidAccounts } from '../data/budgetRepository';
 import { colors, radius, shadow, spacing } from '../theme';
 import type { Account, NetWorthSnapshot } from '../types';
+import { showMessage } from '../utils/dialogs';
 import { formatMoney } from '../utils/money';
 import { summarizeNetWorth } from '../utils/netWorth';
 
@@ -33,11 +34,26 @@ export function ConnectScreen({ accounts, cloudMode, netWorthHistory, onAccounts
   const sync = async () => {
     setSyncing(true);
     try {
-      await syncPlaidAccounts();
-      await onAccountsChanged();
-      Alert.alert('Accounts updated', 'Your latest available balances and transactions are now in the budget.');
+      const result = await syncPlaidAccounts();
+      try {
+        await onAccountsChanged();
+      } catch {
+        showMessage('Sync finished', 'Zenify could not refresh the account screen. Reopen Accounts to see the latest available data.');
+        return;
+      }
+      const failed = result.results.filter((item): item is { itemId: string; error: string } => 'error' in item);
+      if (failed.length) {
+        const institutions = failed.map((item) => accounts.find((account) => account.connectionId === item.itemId)?.institution ?? 'A bank');
+        const uniqueInstitutions = [...new Set(institutions)];
+        showMessage(
+          'Some accounts need attention',
+          `${result.syncedItems} ${result.syncedItems === 1 ? 'connection' : 'connections'} updated. ${uniqueInstitutions.join(', ')} could not sync. Open the affected bank connection to repair it, or try again later.\n\n${failed[0]?.error ?? ''}`.trim(),
+        );
+      } else {
+        showMessage('Accounts updated', 'Your latest available balances and transactions are now in the budget.');
+      }
     } catch (caught) {
-      Alert.alert('Could not sync accounts', caught instanceof Error ? caught.message : 'Please try again.');
+      showMessage('Could not sync accounts', caught instanceof Error ? caught.message : 'Please try again.');
     } finally {
       setSyncing(false);
     }
@@ -49,12 +65,12 @@ export function ConnectScreen({ accounts, cloudMode, netWorthHistory, onAccounts
       const disconnectedAccounts = result?.disconnectedAccounts ?? 0;
       await onAccountsChanged();
       setManagedAccount(null);
-      Alert.alert(
+      showMessage(
         'Institution disconnected',
         `${disconnectedAccounts} ${disconnectedAccounts === 1 ? 'account was' : 'accounts were'} disconnected. Imported history is still available.`,
       );
     } catch (caught) {
-      Alert.alert('Could not disconnect institution', caught instanceof Error ? caught.message : 'Please try again.');
+      showMessage('Could not disconnect institution', caught instanceof Error ? caught.message : 'Please try again.');
       throw caught;
     }
   };

@@ -8,6 +8,7 @@ The web beta now contains the complete connection boundary: authenticated Link-t
 - Open Plaid Link in the installable web app.
 - Send the returned public token to the API.
 - Show connection, sync, and re-authentication states.
+- Show which institution failed when a manual sync succeeds for only some connections.
 - Never receive or store a Plaid access token.
 
 ## Server responsibilities

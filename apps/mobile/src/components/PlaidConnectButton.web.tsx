@@ -1,10 +1,11 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { usePlaidLink, type PlaidLinkOnExit, type PlaidLinkOnSuccess } from 'react-plaid-link';
 
 import { completePlaidUpdate, createPlaidLinkToken, exchangePlaidPublicToken } from '../data/budgetRepository';
 import { colors, radius, shadow, spacing } from '../theme';
+import { showMessage } from '../utils/dialogs';
 import type { PlaidConnectButtonProps } from './PlaidConnectButton.types';
 
 type Phase = 'idle' | 'requesting' | 'opening' | 'saving';
@@ -75,7 +76,7 @@ export function PlaidConnectButton({ appearance = 'primary', enabled, itemId, la
 
   const onSuccess = useCallback<PlaidLinkOnSuccess>(async (publicToken, metadata) => {
     if (!activeItemId && !publicToken) {
-      Alert.alert('Could not connect account', 'Plaid did not return a connection token. Please try again.');
+      showMessage('Could not connect account', 'Plaid did not return a connection token. Please try again.');
       resetLink();
       return;
     }
@@ -88,12 +89,12 @@ export function PlaidConnectButton({ appearance = 'primary', enabled, itemId, la
         await exchangePlaidPublicToken(publicToken, metadata.institution?.name);
       }
       await onConnected();
-      Alert.alert(
+      showMessage(
         activeItemId ? 'Connection repaired' : 'Account connected',
         activeItemId ? 'Plaid access is current and your latest available data has been synced.' : 'Your accounts are connected and the first transaction sync has started.',
       );
     } catch (caught) {
-      Alert.alert('Could not finish connecting', caught instanceof Error ? caught.message : 'Please try again.');
+      showMessage('Could not finish connecting', caught instanceof Error ? caught.message : 'Please try again.');
     } finally {
       resetLink();
     }
@@ -103,7 +104,7 @@ export function PlaidConnectButton({ appearance = 'primary', enabled, itemId, la
     if (error) {
       const reference = metadata.request_id ?? metadata.link_session_id;
       const detail = error.display_message ?? error.error_message ?? 'Please try again.';
-      Alert.alert('Plaid closed', reference ? `${detail}\n\nSupport reference: ${reference}` : detail);
+      showMessage('Plaid closed', reference ? `${detail}\n\nSupport reference: ${reference}` : detail);
     }
     resetLink();
   }, [resetLink]);
@@ -122,7 +123,7 @@ export function PlaidConnectButton({ appearance = 'primary', enabled, itemId, la
     const stored = readStoredSession();
     if (!stored) {
       cleanOAuthUrl();
-      Alert.alert('Connection expired', 'Return to Accounts and start the Plaid connection again.');
+      showMessage('Connection expired', 'Return to Accounts and start the Plaid connection again.');
       return;
     }
     setEnvironment(stored.environment);
@@ -141,7 +142,7 @@ export function PlaidConnectButton({ appearance = 'primary', enabled, itemId, la
 
   useEffect(() => {
     if (!error) return;
-    Alert.alert('Plaid could not load', error.message ?? 'Check your connection and try again.');
+    showMessage('Plaid could not load', error.message ?? 'Check your connection and try again.');
     resetLink();
   }, [error, resetLink]);
 
@@ -171,13 +172,13 @@ export function PlaidConnectButton({ appearance = 'primary', enabled, itemId, la
       }
     } catch (caught) {
       resetLink();
-      Alert.alert('Plaid setup needed', caught instanceof Error ? caught.message : 'Please try again.');
+      showMessage('Plaid setup needed', caught instanceof Error ? caught.message : 'Please try again.');
     }
   };
 
   const connect = () => {
     if (!enabled) {
-      Alert.alert('Sign in first', 'Create or sign in to your account before connecting a bank.');
+      showMessage('Sign in first', 'Create or sign in to your account before connecting a bank.');
       return;
     }
     void requestLinkToken();
