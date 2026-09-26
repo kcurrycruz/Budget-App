@@ -224,7 +224,11 @@ export function ConnectScreen({ accounts, cloudMode, netWorthHistory, onAccounts
                 <Text style={styles.accountName}>{account.name}</Text>
                 <Text style={styles.accountMeta}>{account.institution} · •••• {account.mask}</Text>
                 <Text style={[styles.syncMeta, account.connectionStatus === 'attention' && styles.syncMetaAttention]}>
-                  {account.connectionStatus === 'attention' ? 'Connection needs attention' : `Updated ${account.syncedAt}`}
+                  {account.connectionStatus === 'attention'
+                    ? 'Connection needs attention'
+                    : account.syncedAt === 'Not synced yet'
+                      ? 'Transactions are preparing'
+                      : `Last successful sync ${account.syncedAt}`}
                 </Text>
               </View>
               <Text style={styles.accountBalance}>{formatMoney(account.balance, true)}</Text>

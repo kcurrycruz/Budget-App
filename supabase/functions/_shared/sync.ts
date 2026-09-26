@@ -75,8 +75,6 @@ export async function upsertAccounts(
     current_balance: account.balances.current,
     available_balance: account.balances.available,
     currency_code: account.balances.iso_currency_code ?? 'USD',
-    connection_status: 'healthy',
-    last_synced_at: now,
     disconnected_at: null,
     updated_at: now,
   })), { onConflict: 'plaid_account_id' });
@@ -269,14 +267,22 @@ export async function syncPlaidItem(
     if (error) throw error;
   }
 
+  const syncedAt = new Date().toISOString();
   const { error: updateError } = await admin.from('plaid_sync_state').upsert({
     plaid_item_id: item.id,
     next_cursor: nextCursor,
-    last_synced_at: now,
+    last_synced_at: syncedAt,
     last_error: null,
-    updated_at: now,
+    updated_at: syncedAt,
   }, { onConflict: 'plaid_item_id' });
   if (updateError) throw updateError;
+
+  const { error: accountStatusError } = await admin.from('financial_accounts').update({
+    connection_status: 'healthy',
+    last_synced_at: syncedAt,
+    updated_at: syncedAt,
+  }).eq('plaid_item_id', item.id).eq('user_id', item.user_id);
+  if (accountStatusError) throw accountStatusError;
 
   return { added: added.length, modified: modified.length, removed: removed.length };
 }

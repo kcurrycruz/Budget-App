@@ -17,6 +17,7 @@ The web beta now contains the complete connection boundary: authenticated Link-t
 - Exchange public tokens for access tokens.
 - Encrypt access tokens at rest and never return them to the client.
 - Fetch and normalize account, balance, and transaction data.
+- Stamp the account's last successful sync only after all transaction changes are saved; a failed sync retains the prior timestamp and attention state.
 - Apply transaction changes incrementally with a per-Item cursor.
 - Support item errors, update mode, disconnect, export, and deletion.
 
