@@ -61,7 +61,7 @@ Deno.serve(async (request) => {
       const payload = await caught.json().catch(() => ({ error: 'Authentication required' })) as Record<string, unknown>;
       return json(payload, caught.status);
     }
-    if (caught instanceof PlaidApiError) return json({ error: caught.message, code: caught.code }, caught.code === 'PLAID_NOT_CONFIGURED' ? 503 : 502);
+    if (caught instanceof PlaidApiError) return json({ error: caught.message, code: caught.code, ...(caught.requestId ? { requestId: caught.requestId } : {}) }, caught.code === 'PLAID_NOT_CONFIGURED' ? 503 : 502);
     return json({ error: errorMessage(caught) }, 500);
   }
 });

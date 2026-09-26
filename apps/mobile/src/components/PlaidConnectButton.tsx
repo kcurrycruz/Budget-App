@@ -8,7 +8,7 @@ export function PlaidConnectButton({ appearance = 'primary', enabled, itemId, la
   const open = () => Alert.alert(
     enabled ? 'Open the web app' : 'Sign in first',
     enabled
-      ? `${itemId ? 'Repairing connections is' : 'Plaid Sandbox is'} available in the web beta. Native Plaid Link will be added with the custom iPhone build.`
+      ? `${itemId ? 'Repairing connections is' : 'Connecting accounts is'} available in the Safari web app. Native Plaid Link will be added with the custom iPhone build.`
       : 'Create or sign in to your account before connecting a bank.',
   );
 

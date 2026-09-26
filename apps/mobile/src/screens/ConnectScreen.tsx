@@ -163,7 +163,7 @@ export function ConnectScreen({ accounts, cloudMode, netWorthHistory, onAccounts
             </View>
           </View>
           <PlaidConnectButton appearance="secondary" enabled={cloudMode} label="Connect account" onConnected={onAccountsChanged} />
-          <Text style={styles.compactSandboxNote}>Sandbox uses test data only.</Text>
+          <Text style={styles.compactConnectionNote}>Review what Zenify accesses before Plaid opens.</Text>
         </View>
       ) : (
         <View style={styles.hero}>
@@ -173,7 +173,7 @@ export function ConnectScreen({ accounts, cloudMode, netWorthHistory, onAccounts
           <Text style={styles.heroTitle}>Connect once. Stay current.</Text>
           <Text style={styles.heroText}>Choose your bank or credit card through Plaid. New transactions can flow into your budget automatically.</Text>
           <PlaidConnectButton enabled={cloudMode} onConnected={onAccountsChanged} />
-          <Text style={styles.sandboxNote}>Sandbox mode uses test bank data only—no real credentials or money.</Text>
+          <Text style={styles.connectionNote}>You’ll review exactly what Zenify accesses before Plaid opens.</Text>
         </View>
       )}
 
@@ -185,7 +185,7 @@ export function ConnectScreen({ accounts, cloudMode, netWorthHistory, onAccounts
         {accounts.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>No connected accounts yet</Text>
-            <Text style={styles.emptyText}>Connect a Sandbox bank above to see balances and imported activity here.</Text>
+            <Text style={styles.emptyText}>Connect a bank above to see balances and imported activity here.</Text>
           </View>
         ) : null}
         {accounts.map((account, index) => (
@@ -230,7 +230,7 @@ export function ConnectScreen({ accounts, cloudMode, netWorthHistory, onAccounts
         <MaterialCommunityIcons color={colors.primaryDark} name="shield-lock-outline" size={25} />
         <View style={styles.safetyCopy}>
           <Text style={styles.safetyTitle}>Designed around privacy</Text>
-          <Text style={styles.safetyText}>Your bank login is handled by Plaid. The app should store access tokens only on the server, never inside the phone app.</Text>
+          <Text style={styles.safetyText}>Your bank login stays with Plaid. Zenify stores only an encrypted connection token on its secure server, never inside the phone app.</Text>
         </View>
       </View>
 
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
   heroIcon: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.lg, height: 62, justifyContent: 'center', marginBottom: spacing.lg, width: 62 },
   heroTitle: { color: colors.ink, fontSize: 23, fontWeight: '800', letterSpacing: -0.4, textAlign: 'center' },
   heroText: { color: colors.inkMuted, fontSize: 14, lineHeight: 21, marginTop: spacing.sm, textAlign: 'center' },
-  sandboxNote: { color: colors.inkMuted, fontSize: 11, lineHeight: 16, marginTop: spacing.sm, textAlign: 'center' },
+  connectionNote: { color: colors.inkMuted, fontSize: 11, lineHeight: 16, marginTop: spacing.sm, textAlign: 'center' },
   netWorthCard: { backgroundColor: colors.primaryDark, borderRadius: radius.lg, gap: spacing.lg, padding: spacing.xl, ...shadow },
   netWorthTop: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'space-between' },
   netWorthLabel: { color: '#BFD0C5', fontSize: 12, fontWeight: '700' },
@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
   connectMoreText: { flex: 1, gap: 3 },
   connectMoreTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
   connectMoreDetail: { color: colors.inkMuted, fontSize: 11 },
-  compactSandboxNote: { color: colors.inkMuted, fontSize: 10, marginTop: spacing.sm, textAlign: 'center' },
+  compactConnectionNote: { color: colors.inkMuted, fontSize: 10, marginTop: spacing.sm, textAlign: 'center' },
   sectionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   sectionTitle: { color: colors.ink, fontSize: 18, fontWeight: '800' },
   sectionMeta: { color: colors.inkMuted, fontSize: 12, fontWeight: '700' },

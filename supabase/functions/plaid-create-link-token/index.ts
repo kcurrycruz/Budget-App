@@ -2,7 +2,7 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 
 import { requireUser } from '../_shared/auth.ts';
 import { errorMessage, handlePreflight, json } from '../_shared/http.ts';
-import { decryptAccessToken, PlaidApiError, plaidPost, plaidWebhookUrl } from '../_shared/plaid.ts';
+import { decryptAccessToken, PlaidApiError, plaidEnvironment, plaidPost, plaidRedirectUri, plaidWebhookUrl } from '../_shared/plaid.ts';
 
 type LinkTokenResponse = { expiration: string; link_token: string };
 
@@ -15,11 +15,14 @@ Deno.serve(async (request) => {
     const { admin, user } = await requireUser(request);
     const body = await request.json().catch(() => ({})) as Record<string, unknown>;
     const itemId = typeof body.itemId === 'string' ? body.itemId : null;
+    const environment = plaidEnvironment();
+    const redirectUri = plaidRedirectUri();
     const baseRequest = {
       client_name: 'Zenify',
       user: { client_user_id: user.id },
       country_codes: ['US'],
       language: 'en',
+      ...(redirectUri ? { redirect_uri: redirectUri } : {}),
     };
 
     if (itemId) {
@@ -37,7 +40,7 @@ Deno.serve(async (request) => {
         ...baseRequest,
         access_token: await decryptAccessToken(item.access_token_ciphertext as string),
       });
-      return json({ linkToken: response.link_token, expiration: response.expiration, updateMode: true });
+      return json({ environment, linkToken: response.link_token, expiration: response.expiration, updateMode: true });
     }
 
     const response = await plaidPost<LinkTokenResponse>('/link/token/create', {
@@ -46,13 +49,13 @@ Deno.serve(async (request) => {
       transactions: { days_requested: 180 },
       webhook: plaidWebhookUrl(),
     });
-    return json({ linkToken: response.link_token, expiration: response.expiration, updateMode: false });
+    return json({ environment, linkToken: response.link_token, expiration: response.expiration, updateMode: false });
   } catch (caught) {
     if (caught instanceof Response) {
       const payload = await caught.json().catch(() => ({ error: 'Authentication required' })) as Record<string, unknown>;
       return json(payload, caught.status);
     }
-    if (caught instanceof PlaidApiError) return json({ error: caught.message, code: caught.code }, caught.code === 'PLAID_NOT_CONFIGURED' ? 503 : 502);
+    if (caught instanceof PlaidApiError) return json({ error: caught.message, code: caught.code, ...(caught.requestId ? { requestId: caught.requestId } : {}) }, caught.code === 'PLAID_NOT_CONFIGURED' ? 503 : 502);
     return json({ error: errorMessage(caught) }, 500);
   }
 });

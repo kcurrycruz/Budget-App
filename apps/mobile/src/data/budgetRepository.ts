@@ -284,8 +284,8 @@ const invokeFunction = async <T>(name: string, body: Record<string, unknown> = {
   let message = error.message;
   if (error instanceof FunctionsHttpError) {
     try {
-      const payload = await error.context.json() as { error?: string };
-      if (payload.error) message = payload.error;
+      const payload = await error.context.json() as { error?: string; requestId?: string };
+      if (payload.error) message = payload.requestId ? `${payload.error} (reference: ${payload.requestId})` : payload.error;
     } catch {
       // Keep the SDK message when the response body is not JSON.
     }
@@ -1139,9 +1139,9 @@ export async function exportCloudBudget() {
 }
 
 export async function createPlaidLinkToken(itemId?: string) {
-  const data = await invokeFunction<{ linkToken: string }>('plaid-create-link-token', itemId ? { itemId } : {});
+  const data = await invokeFunction<{ environment: 'sandbox' | 'development' | 'production'; expiration: string; linkToken: string }>('plaid-create-link-token', itemId ? { itemId } : {});
   if (!data?.linkToken) throw new Error('Plaid did not return a link token.');
-  return data.linkToken;
+  return data;
 }
 
 export async function completePlaidUpdate(itemId: string) {

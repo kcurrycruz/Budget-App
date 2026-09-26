@@ -1,6 +1,6 @@
-# Plaid Sandbox integration
+# Plaid integration
 
-The web beta now contains the complete connection boundary: authenticated Link-token creation, Plaid Link for web, one-time public-token exchange, AES-GCM encrypted access-token storage, account import, and incremental `/transactions/sync` support. It stays in Sandbox until the workflow and categorization UX are proven.
+The web beta now contains the complete connection boundary: authenticated Link-token creation, Plaid Link for web, one-time public-token exchange, AES-GCM encrypted access-token storage, account import, and incremental `/transactions/sync` support. It stays in Sandbox until Plaid grants Production access and the launch checklist is complete.
 
 ## Client responsibilities
 
@@ -29,6 +29,7 @@ Start with Transactions for spending and cash-flow visibility. Add other Plaid p
 - `PLAID_SECRET`: Plaid Sandbox secret.
 - `PLAID_ENV`: `sandbox` while testing.
 - `PLAID_TOKEN_ENCRYPTION_KEY`: a base64-encoded random 32-byte key used only by Edge Functions.
+- `PLAID_REDIRECT_URI`: the exact registered HTTPS return URL for mobile OAuth (`https://kcurry-budget.expo.app/` in production). Do not include query parameters or fragments.
 
 Generate the encryption key locally with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`, then store it directly in Supabase Edge Function secrets. Never commit any of these values.
 
@@ -37,6 +38,8 @@ Sandbox Link uses test data only. Plaid's standard Sandbox credential is `user_g
 ## Platform note
 
 Plaid Link for web runs in supported iPhone browsers and is used by the installable web beta. Plaid's React Native SDK contains native code and does not run in Expo Go, so a custom Expo development build is still required before the same flow can be added to the native binary.
+
+Mobile OAuth returns reuse the original short-lived Link token from browser storage and pass the full `oauth_state_id` return URL back to Plaid. The stored Link session expires locally after three hours and is removed after success, exit, or an error. Add the exact redirect URI to Plaid Dashboard before setting the server secret.
 
 ## Connection lifecycle
 
@@ -54,4 +57,12 @@ Plaid Link for web runs in supported iPhone browsers and is used by the installa
 
 ## Next hardening milestone
 
-Add production monitoring and alert delivery before moving Plaid out of Sandbox. Supabase leaked-password screening can be enabled after upgrading from the Free plan; the app already requires at least eight characters for new account passwords.
+Before moving Plaid out of Sandbox:
+
+1. Complete the Plaid application/company profile and security questionnaire, then request Production access.
+2. Register `https://kcurry-budget.expo.app/` as an allowed redirect URI and verify OAuth test cases on iPhone Safari and the Home Screen install.
+3. Publish customer-facing privacy, data-retention, and support pages linked from Zenify and the Plaid application profile.
+4. Add production monitoring and alert delivery for Link exits, API failures, webhook backlog, and repeated sync failures.
+5. Replace the Sandbox secret with the Production secret and set `PLAID_ENV=production` only after a final test and rollback review.
+
+Supabase leaked-password screening can be enabled after upgrading from the Free plan; the app already requires at least eight characters for new account passwords.

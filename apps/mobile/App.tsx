@@ -71,6 +71,15 @@ import { useReducedMotion } from './src/utils/useReducedMotion';
 
 const tabOrder: AppTab[] = ['home', 'transactions', 'plan', 'connect'];
 
+const initialTab = (): AppTab => {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return 'home';
+  try {
+    return new URL(window.location.href).searchParams.has('oauth_state_id') ? 'connect' : 'home';
+  } catch {
+    return 'home';
+  }
+};
+
 type TabTransitionProps = PropsWithChildren<{
   direction: -1 | 1;
 }>;
@@ -276,7 +285,7 @@ type BudgetAppProps = { session: Session | null };
 function BudgetApp({ session }: BudgetAppProps) {
   const cloudMode = Boolean(session);
   const forcePlanPreview = process.env.EXPO_PUBLIC_FORCE_PLAN_SETUP === 'true';
-  const [activeTab, setActiveTab] = useState<AppTab>('home');
+  const [activeTab, setActiveTab] = useState<AppTab>(initialTab);
   const [transitionDirection, setTransitionDirection] = useState<-1 | 1>(1);
   const [selectedMonth, setSelectedMonth] = useState(currentMonthStart());
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);

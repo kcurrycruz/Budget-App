@@ -65,12 +65,29 @@ const plaidConfiguration = () => {
   const secret = Deno.env.get('PLAID_SECRET');
   const environment = Deno.env.get('PLAID_ENV') ?? 'sandbox';
   if (!clientId || !secret || !Deno.env.get('PLAID_TOKEN_ENCRYPTION_KEY')) {
-    throw new PlaidApiError('Plaid Sandbox is not configured yet.', 'PLAID_NOT_CONFIGURED');
+    throw new PlaidApiError('Plaid is not configured yet.', 'PLAID_NOT_CONFIGURED');
   }
   if (!['sandbox', 'development', 'production'].includes(environment)) {
     throw new PlaidApiError('The Plaid environment is invalid.', 'PLAID_NOT_CONFIGURED');
   }
   return { clientId, environment, secret };
+};
+
+export const plaidEnvironment = () => plaidConfiguration().environment;
+
+export const plaidRedirectUri = () => {
+  const value = Deno.env.get('PLAID_REDIRECT_URI')?.trim();
+  if (!value) return undefined;
+
+  try {
+    const url = new URL(value);
+    const environment = plaidEnvironment();
+    const sandboxLocalhost = environment === 'sandbox' && url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname);
+    if ((url.protocol !== 'https:' && !sandboxLocalhost) || url.search || url.hash) throw new Error('invalid redirect URI');
+    return url.toString();
+  } catch {
+    throw new PlaidApiError('The Plaid redirect URL must be an HTTPS URL without a query or fragment.', 'PLAID_NOT_CONFIGURED');
+  }
 };
 
 export async function plaidPost<T>(path: string, body: Record<string, unknown>): Promise<T> {

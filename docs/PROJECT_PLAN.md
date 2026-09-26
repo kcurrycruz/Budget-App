@@ -40,6 +40,7 @@ The current private beta is a foundation, not a locked final design. Continue ad
 - More useful cash-flow trends, monthly comparisons, and goal tracking.
 - Continued navigation, typography, spacing, accessibility, and visual-polish iterations.
 - Native iPhone-specific improvements after the custom development build is introduced.
+- Finish Plaid Production onboarding, public privacy/support pages, mobile OAuth testing, and operational alerts before real-bank access is enabled.
 
 ## User-research roadmap
 
@@ -142,3 +143,4 @@ Record decisions here with the date, decision, and reason. Move longer technical
 - 2026-09-24: Planned expenses offer opt-in monthly sinking-fund automation. Zenify records one private bookkeeping contribution per expense per month, recalculates the remaining pace, and never claims to transfer money between financial accounts.
 - 2026-09-24: Plaid category confidence controls automation. Merchant rules and user-reviewed choices remain authoritative; only high-confidence semantic matches bypass Review, and a posted transaction replaces its linked pending record without losing a prior correction.
 - 2026-09-24: Expected-income automation remains review-first. Zenify requires at least three recent Plaid income deposits with a stable weekly, roughly biweekly, or monthly cadence, estimates a monthly average, and changes the plan only after the user chooses “Use estimate.”
+- 2026-09-26: Plaid connection consent now explains the exact account and transaction data Zenify receives before Link opens. The web flow reads its actual server environment, preserves the short-lived Link session for mobile OAuth returns, and never labels a future Production connection as Sandbox.
