@@ -1,11 +1,11 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PlaidConnectButton } from '../components/PlaidConnectButton';
 import { ManageConnectionModal } from '../components/ManageConnectionModal';
 import { ScreenHeader } from '../components/ScreenHeader';
-import { disconnectPlaidItem, syncPlaidAccounts } from '../data/budgetRepository';
+import { disconnectPlaidItem, loadPlaidConnectionHealth, syncPlaidAccounts, type PlaidConnectionIssue } from '../data/budgetRepository';
 import { colors, radius, shadow, spacing } from '../theme';
 import type { Account, NetWorthSnapshot } from '../types';
 import { showMessage } from '../utils/dialogs';
@@ -24,6 +24,7 @@ const formatSnapshotMonth = (month: string) => new Date(`${month}T00:00:00`).toL
 export function ConnectScreen({ accounts, cloudMode, netWorthHistory, onAccountsChanged }: ConnectScreenProps) {
   const [syncing, setSyncing] = useState(false);
   const [managedAccount, setManagedAccount] = useState<Account | null>(null);
+  const [connectionIssues, setConnectionIssues] = useState<Record<string, PlaidConnectionIssue>>({});
   const { assets, debts } = summarizeNetWorth(accounts);
   const netWorth = assets - debts;
   const visibleHistory = netWorthHistory.slice(-6);
@@ -31,6 +32,24 @@ export function ConnectScreen({ accounts, cloudMode, netWorthHistory, onAccounts
   const firstSnapshot = visibleHistory[0];
   const latestSnapshot = visibleHistory.at(-1);
   const historyChange = firstSnapshot && latestSnapshot ? latestSnapshot.netWorth - firstSnapshot.netWorth : 0;
+
+  useEffect(() => {
+    if (!cloudMode || accounts.length === 0) {
+      setConnectionIssues({});
+      return;
+    }
+    let active = true;
+    void loadPlaidConnectionHealth()
+      .then((connections) => {
+        if (!active) return;
+        setConnectionIssues(Object.fromEntries(connections.map((connection) => [connection.itemId, connection.issue])));
+      })
+      .catch(() => {
+        if (active) setConnectionIssues({});
+      });
+    return () => { active = false; };
+  }, [accounts, cloudMode]);
+
   const sync = async () => {
     setSyncing(true);
     try {
@@ -53,6 +72,7 @@ export function ConnectScreen({ accounts, cloudMode, netWorthHistory, onAccounts
         showMessage('Accounts updated', 'Your latest available balances and transactions are now in the budget.');
       }
     } catch (caught) {
+      await onAccountsChanged().catch(() => undefined);
       showMessage('Could not sync accounts', caught instanceof Error ? caught.message : 'Please try again.');
     } finally {
       setSyncing(false);
@@ -204,8 +224,10 @@ export function ConnectScreen({ accounts, cloudMode, netWorthHistory, onAccounts
             <Text style={styles.emptyText}>Connect a bank above to see balances and imported activity here.</Text>
           </View>
         ) : null}
-        {accounts.map((account, index) => (
-          <View key={account.id}>
+        {accounts.map((account, index) => {
+          const issue = account.connectionId ? connectionIssues[account.connectionId] : null;
+          const needsAttention = account.connectionStatus === 'attention' || issue === 'repair' || issue === 'retry';
+          return <View key={account.id}>
             <Pressable
               accessibilityHint={account.connectionId ? 'Opens connection settings' : undefined}
               accessibilityLabel={account.connectionId ? `Manage ${account.name}` : undefined}
@@ -223,20 +245,24 @@ export function ConnectScreen({ accounts, cloudMode, netWorthHistory, onAccounts
               <View style={styles.accountCopy}>
                 <Text style={styles.accountName}>{account.name}</Text>
                 <Text style={styles.accountMeta}>{account.institution} · •••• {account.mask}</Text>
-                <Text style={[styles.syncMeta, account.connectionStatus === 'attention' && styles.syncMetaAttention]}>
-                  {account.connectionStatus === 'attention'
-                    ? 'Connection needs attention'
-                    : account.syncedAt === 'Not synced yet'
-                      ? 'Transactions are preparing'
-                      : `Last successful sync ${account.syncedAt}`}
+                <Text style={[styles.syncMeta, needsAttention && styles.syncMetaAttention]}>
+                  {issue === 'repair'
+                    ? 'Bank sign-in needs renewing'
+                    : issue === 'retry'
+                      ? 'Latest sync failed · Try again'
+                      : account.connectionStatus === 'attention'
+                        ? 'Connection needs attention'
+                        : account.syncedAt === 'Not synced yet'
+                          ? 'Transactions are preparing'
+                          : `Last successful sync ${account.syncedAt}`}
                 </Text>
               </View>
               <Text style={styles.accountBalance}>{formatMoney(account.balance, true)}</Text>
-              {account.connectionId ? <MaterialCommunityIcons color={account.connectionStatus === 'attention' ? colors.danger : colors.inkMuted} name="chevron-right" size={20} /> : null}
+              {account.connectionId ? <MaterialCommunityIcons color={needsAttention ? colors.danger : colors.inkMuted} name="chevron-right" size={20} /> : null}
             </Pressable>
             {index < accounts.length - 1 ? <View style={styles.divider} /> : null}
-          </View>
-        ))}
+          </View>;
+        })}
       </View>
 
       {accounts.length > 0 && cloudMode ? (
@@ -256,6 +282,7 @@ export function ConnectScreen({ accounts, cloudMode, netWorthHistory, onAccounts
 
       <ManageConnectionModal
         account={managedAccount}
+        issue={managedAccount?.connectionId ? connectionIssues[managedAccount.connectionId] : null}
         affectedAccountCount={managedAccount?.connectionId
           ? accounts.filter((account) => account.connectionId === managedAccount.connectionId).length
           : 0}

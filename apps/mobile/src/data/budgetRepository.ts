@@ -1172,3 +1172,15 @@ export async function syncPlaidAccounts() {
   }
   return data;
 }
+
+export type PlaidConnectionIssue = 'repair' | 'retry' | null;
+
+export async function loadPlaidConnectionHealth() {
+  const data = await invokeFunction<{
+    connections: Array<{ itemId: string; issue: PlaidConnectionIssue }>;
+  }>('plaid-connection-health');
+  if (!data || !Array.isArray(data.connections)) {
+    throw new Error('Connection health is unavailable right now.');
+  }
+  return data.connections;
+}

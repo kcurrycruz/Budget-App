@@ -2,6 +2,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import type { PlaidConnectionIssue } from '../data/budgetRepository';
 import { colors, radius, spacing } from '../theme';
 import type { Account } from '../types';
 import { PlaidConnectButton } from './PlaidConnectButton';
@@ -9,6 +10,7 @@ import { PlaidConnectButton } from './PlaidConnectButton';
 type ManageConnectionModalProps = {
   account: Account | null;
   affectedAccountCount: number;
+  issue?: PlaidConnectionIssue;
   onClose: () => void;
   onDisconnect: (connectionId: string) => Promise<void>;
   onReconnected: () => Promise<void>;
@@ -17,6 +19,7 @@ type ManageConnectionModalProps = {
 export function ManageConnectionModal({
   account,
   affectedAccountCount,
+  issue,
   onClose,
   onDisconnect,
   onReconnected,
@@ -62,12 +65,16 @@ export function ManageConnectionModal({
           </Text>
         </View>
 
-        {account.connectionStatus === 'attention' ? (
+        {account.connectionStatus === 'attention' || issue ? (
           <View style={styles.attentionCard}>
             <MaterialCommunityIcons color={colors.danger} name="alert-circle-outline" size={22} />
             <View style={styles.attentionCopy}>
-              <Text style={styles.attentionTitle}>Connection needs attention</Text>
-              <Text style={styles.attentionText}>Repair this connection to keep balances and transactions updating automatically.</Text>
+              <Text style={styles.attentionTitle}>{issue === 'retry' ? 'Latest sync did not finish' : 'Connection needs attention'}</Text>
+              <Text style={styles.attentionText}>
+                {issue === 'retry'
+                  ? 'Close this screen and try Sync latest transactions. If it keeps failing, renew the bank connection below.'
+                  : 'Renew your bank sign-in to keep balances and transactions updating automatically.'}
+              </Text>
             </View>
           </View>
         ) : null}

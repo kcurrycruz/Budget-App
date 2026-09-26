@@ -8,6 +8,7 @@ The web beta now contains the complete connection boundary: authenticated Link-t
 - Open Plaid Link in the installable web app.
 - Send the returned public token to the API.
 - Show connection, sync, and re-authentication states.
+- Show a private, plain-language distinction between a bank sign-in that needs renewal and a sync that can be retried.
 - Show which institution failed when a manual sync succeeds for only some connections.
 - Never receive or store a Plaid access token.
 
@@ -20,6 +21,7 @@ The web beta now contains the complete connection boundary: authenticated Link-t
 - Stamp the account's last successful sync only after all transaction changes are saved; a failed sync retains the prior timestamp and attention state.
 - Apply transaction changes incrementally with a per-Item cursor.
 - Support item errors, update mode, disconnect, export, and deletion.
+- Return only the signed-in user's connection-health classification to the app; keep Plaid credentials, cursors, and raw server errors private.
 
 ## Initial product choice
 
